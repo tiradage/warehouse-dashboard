@@ -8,7 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDrEIvuTdQaRc_8mNQOIP_LsSqDVHQSqDU",
@@ -21,17 +21,23 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
-// ══ Save to Firestore ══════════════════════════════════════════
+// ══ Save to Firestore (แบ่งหลาย doc ถ้าใหญ่) ══════════════════
 window.fbSave = async function(key, data){
   try{
-    // แบ่ง chunk ถ้าข้อมูลใหญ่เกิน (Firestore limit 1MB/doc)
     const json = JSON.stringify(data);
-    const chunkSize = 800000; // ~800KB per chunk
+    const chunkSize = 900000; // ~900KB per doc (Firestore limit ~1MB)
     const chunks = [];
     for(let i=0;i<json.length;i+=chunkSize) chunks.push(json.slice(i,i+chunkSize));
-    await setDoc(doc(db,'dashboard',key),{chunks, total:chunks.length, updatedAt:Date.now()});
-    console.log(`fbSave ${key}: ${chunks.length} chunks`);
-  }catch(e){ console.error('fbSave error',e); }
+    // เซฟ index doc บอกว่ามีกี่ chunk
+    const batch = writeBatch(db);
+    batch.set(doc(db,'dashboard',key),{total:chunks.length, updatedAt:Date.now()});
+    // เซฟแต่ละ chunk เป็น sub-doc แยก
+    chunks.forEach((chunk,i)=>{
+      batch.set(doc(db,'dashboard',`${key}_chunk_${i}`),{data:chunk});
+    });
+    await batch.commit();
+    console.log(`fbSave ${key}: ${chunks.length} chunks, ${json.length} bytes`);
+  }catch(e){ console.error('fbSave error',e); showToast('บันทึก cloud ไม่สำเร็จ: '+e.message, true); }
 };
 
 // ══ Load from Firestore ════════════════════════════════════════
@@ -39,8 +45,13 @@ window.fbLoad = async function(key){
   try{
     const snap = await getDoc(doc(db,'dashboard',key));
     if(!snap.exists()) return null;
-    const {chunks} = snap.data();
-    return JSON.parse(chunks.join(''));
+    const {total} = snap.data();
+    // โหลดทุก chunk พร้อมกัน
+    const chunkSnaps = await Promise.all(
+      Array.from({length:total},(_,i)=>getDoc(doc(db,'dashboard',`${key}_chunk_${i}`)))
+    );
+    const json = chunkSnaps.map(s=>s.exists()?s.data().data:'').join('');
+    return JSON.parse(json);
   }catch(e){ console.error('fbLoad error',e); return null; }
 };
 
@@ -54,11 +65,9 @@ window.addEventListener('load', async ()=>{
       window.fbLoad('cn43n')
     ]);
     if(mb52Raw){
-      // restore invData and mb52StockMap
-      const saved = mb52Raw;
-      invData = saved.invData || [];
-      mb52StockMap = saved.mb52StockMap || {};
-      const today = new Date(saved.date||Date.now()).toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'});
+      invData = mb52Raw.invData || [];
+      mb52StockMap = mb52Raw.mb52StockMap || {};
+      const today = new Date(mb52Raw.date||Date.now()).toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'});
       document.getElementById('mb52Date').textContent = `MB52 · ${today}`;
       document.getElementById('sapBadge').style.display='inline-block';
     }
