@@ -478,6 +478,7 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--muted
       <div class="ts" id="prTableScroll" style="display:none">
         <table>
           <thead><tr>
+            <th style="width:36px"></th>
             <th data-tbl="pr" data-col="trackNo">Track No. <span class="si">↕</span></th>
             <th data-tbl="pr" data-col="prNo">PR No. <span class="si">↕</span></th>
             <th data-tbl="pr" data-col="prDate">PR Date <span class="si">↕</span></th>
@@ -615,7 +616,7 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--muted
 // ══ Config ════════════════════════════════════════════════════
 const API_KEY = 'AIzaSyCvkiTwaLMh15jAjNZwDzWv0khG4lp5Qic';
 const OAUTH_CLIENT_ID = '394320236714-2kncrl73s1b8vk8c88ltd74ni9vuhfvi.apps.googleusercontent.com';
-const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
+const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
 const SHEET_NAME_ID  = '19u45GPpSV93LDbXhd-dvbOtKvBYd76oNTlxQPTUsaKw'; // ชื่อพัสดุ
 const SHEET_PR_ID    = '1n4TyE32F8xA2wXAIutMV2HwaPo3Ceriy4EomTONvJUo'; // ขอซื้อ
 
@@ -1248,25 +1249,41 @@ function renderPr(){
     } else {
       daysCell=`<td class="mono" style="color:var(--muted);text-align:center">–</td>`;
     }
+    // inline edit helper — คลิก cell แก้ได้เลย
+    const ie=(field,val,type='text',opts=null)=>{
+      if(!gAccessToken) return `<td class="mono" onclick="event.stopPropagation()" style="color:var(--muted)">${val||'–'}</td>`;
+      if(type==='select'&&opts){
+        const optHtml=opts.map(o=>`<option value="${o}" ${val===o?'selected':''}>${o}</option>`).join('');
+        return `<td onclick="event.stopPropagation()" style="padding:2px 4px">
+          <select class="ie-sel" onchange="inlineUpdate(${r.id},'${field}',this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:.75rem;font-family:'Sarabun',sans-serif;width:80px">${optHtml}</select></td>`;
+      }
+      if(type==='date'){
+        const dv=dateToInput(val);
+        return `<td onclick="event.stopPropagation()" style="padding:2px 4px">
+          <input type="date" class="ie-inp" value="${dv}" onchange="inlineUpdate(${r.id},'${field}',this.value,'date')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 4px;font-size:.72rem;width:120px;color-scheme:dark"></td>`;
+      }
+      return `<td onclick="event.stopPropagation()" style="padding:2px 4px">
+        <input type="text" class="ie-inp" value="${val||''}" placeholder="–" onblur="inlineUpdate(${r.id},'${field}',this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:.75rem;font-family:'IBM Plex Mono',monospace;width:100px"></td>`;
+    };
     return `<tr style="${rowStyle}" onclick="openPrMo(${r.id})">
-      <td class="mono" style="color:var(--muted);font-size:.74rem">${r.trackNo||'–'}</td>
+      <td onclick="event.stopPropagation();if(!gAccessToken){showToast('กรุณา Login ก่อนครับ',true);return;}openUpdateStatusMo(${r.id})" style="cursor:pointer;text-align:center;color:${gAccessToken?'var(--blue)':'var(--border)'};font-size:.8rem;padding:4px 6px;white-space:nowrap" title="แก้ไขเพิ่มเติม">✏️</td>
       <td class="mono" style="color:var(--text)">${r.prNo||'–'}</td>
       <td class="mono">${r.prDate||'–'}</td>
       ${daysCell}
-      <td class="mono" style="color:var(--text)">${r.poNo||'–'}</td>
-      <td class="mono">${r.poDate||'–'}</td>
+      ${ie('poNo',r.poNo,'text')}
+      ${ie('poDate',r.poDate,'date')}
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;font-weight:500">${r.itemName||'–'}</td>
       <td class="mono">${r.qty||'–'}</td>
       <td class="mono" style="text-align:right">${r.deliveryDays||'–'}</td>
       <td class="mono">${r.dueDate||'–'}</td>
-      <td class="mono">${r.receiveDate||'–'}</td>
-      <td class="mono">${r.accountDate||'–'}</td>
-      <td>${r.s103?`<span class="badge ${s103cls}">${r.s103}</span>`:'–'}</td>
-      <td>${r.s105?`<span class="badge ${s105cls}">${r.s105}</span>`:'–'}</td>
+      ${ie('receiveDate',r.receiveDate,'date')}
+      ${ie('accountDate',r.accountDate,'date')}
+      ${ie('s103',r.s103,'select',['รอรับ','รับแล้ว','ยกเลิก'])}
+      ${ie('s105',r.s105,'select',['รอรับ','รับแล้ว','ยกเลิก'])}
       <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;font-size:.76rem;color:var(--muted)">${r.company||'–'}</td>
       <td style="font-size:.76rem;color:var(--muted)">${r.budget||'–'}</td>
-      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;font-size:.76rem;color:var(--muted);font-family:'Sarabun',sans-serif">${r.note||'–'}</td>
-      <td onclick="event.stopPropagation();if(!gAccessToken){showToast('กรุณา Login ก่อนครับ',true);return;}openUpdateStatusMo(${r.id})" style="cursor:pointer;text-align:center;color:${gAccessToken?'var(--blue)':'var(--border)'};font-size:.75rem;white-space:nowrap;padding:4px 8px" title="${gAccessToken?'แก้ไขสถานะ':'Login เพื่อแก้ไข'}">✏️</td>
+      ${ie('note',r.note,'text')}
+      <td class="mono" style="color:var(--muted);font-size:.74rem">${r.trackNo||'–'}</td>
     </tr>`;
   }).join('');
   renderPag('prPi','prPbtns',prPage,pages,total,p=>{prPage=p;renderPr();});
@@ -1620,7 +1637,7 @@ function openPrMo(id){
   document.getElementById('mo').classList.add('open');
 }
 
-function closeMo(e){if(e.target===document.getElementById('mo'))closeMoDirect();}
+function closeMo(e){if(!e||e.target===document.getElementById('mo'))closeMoDirect();}
 function closeMoDirect(){document.getElementById('mo').classList.remove('open');}
 
 // ══ Export ════════════════════════════════════════════════════
@@ -2101,27 +2118,303 @@ function googleLogout(){
 window.addEventListener('load',()=>{ if(window.google?.accounts?.oauth2) initGoogleAuth(); else setTimeout(initGoogleAuth,2000); });
 
 // ══ Sheets Write API ══════════════════════════════════════════
+async function ensureToken(){
+  return new Promise((resolve,reject)=>{
+    if(gAccessToken){ resolve(); return; }
+    if(!tokenClient){ reject(new Error('ยังไม่ได้ Login')); return; }
+    tokenClient.callback=(resp)=>{
+      if(resp.error){ reject(new Error('Token refresh failed: '+resp.error)); return; }
+      gAccessToken=resp.access_token;
+      resolve();
+    };
+    tokenClient.requestAccessToken({prompt:''});
+  });
+}
+
 async function sheetsAppend(sheetName, values){
-  if(!gAccessToken){ showToast('กรุณา Login ก่อนครับ',true); return false; }
+  try{ await ensureToken(); }catch(e){ showToast('กรุณา Login ก่อนครับ',true); return false; }
   const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_PR_ID}/values/${encodeURIComponent(sheetName)}!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
   const res=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+gAccessToken,'Content-Type':'application/json'},body:JSON.stringify({values})});
+  if(res.status===401){ gAccessToken=null; showToast('Token หมดอายุ กรุณา Login ใหม่',true); return false; }
   if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'Sheets write error');}
   return true;
 }
 
 async function sheetsUpdate(range, values){
-  if(!gAccessToken){ showToast('กรุณา Login ก่อนครับ',true); return false; }
+  try{ await ensureToken(); }catch(e){ showToast('กรุณา Login ก่อนครับ',true); return false; }
   const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_PR_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
   const res=await fetch(url,{method:'PUT',headers:{Authorization:'Bearer '+gAccessToken,'Content-Type':'application/json'},body:JSON.stringify({values})});
+  if(res.status===401){ gAccessToken=null; showToast('Token หมดอายุ กรุณา Login ใหม่',true); return false; }
   if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'Sheets update error');}
   return true;
 }
 
 // ══ Add PR Modal ══════════════════════════════════════════════
+// ══ Date Picker Helper ════════════════════════════════════════
+function makeDatePicker(inputId){
+  const inp=document.getElementById(inputId);
+  if(!inp) return;
+  inp.type='date';
+  inp.style.cssText+='color-scheme:dark;';
+  // set default to today in yyyy-mm-dd for input[type=date]
+  if(!inp.value){
+    const n=new Date();
+    inp.value=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+  }
+}
+function dateInputVal(inputId){
+  const inp=document.getElementById(inputId);
+  if(!inp||!inp.value) return '';
+  const [y,m,d]=inp.value.split('-');
+  return `${d}/${m}/${y}`; // dd/mm/yyyy ค.ศ.
+}
+function dateToInput(dateStr){
+  // dd/mm/yyyy → yyyy-mm-dd
+  if(!dateStr) return '';
+  const p=dateStr.split('/');
+  if(p.length<3) return '';
+  let y=p[2]; if(y.length===4&&parseInt(y)>2500) y=String(parseInt(y)-543);
+  return `${y}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+}
+
+// ══ Add PR Modal (หลายรายการพัสดุ) ════════════════════════════
+let prItems=[]; // [{code,name,qty,price}]
+
 function openAddPrModal(){
   if(!gAccessToken){ showToast('กรุณา Login ก่อนครับ',true); return; }
-  const today=new Date().toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'/');
+  prItems=[{code:'',name:'',qty:'',price:''}];
+  renderAddPrModal();
+  document.getElementById('mo').classList.add('open');
+}
+
+function renderAddPrModal(){
+  const itemsHtml=prItems.map((item,i)=>`
+    <div style="display:grid;grid-template-columns:140px 1fr 80px 100px 30px;gap:8px;align-items:end;margin-bottom:8px">
+      <div>
+        ${i===0?'<label style="font-size:.73rem;color:var(--muted);display:block;margin-bottom:4px">รหัสวัสดุ *</label>':''}
+        <input type="text" class="mo-input" placeholder="รหัส" value="${item.code}" oninput="prItems[${i}].code=this.value;autoFillPrItem(${i},this.value)" style="width:100%">
+      </div>
+      <div>
+        ${i===0?'<label style="font-size:.73rem;color:var(--muted);display:block;margin-bottom:4px">รายการพัสดุ</label>':''}
+        <input type="text" class="mo-input" placeholder="(ดึงอัตโนมัติ)" value="${item.name}" oninput="prItems[${i}].name=this.value" id="pr_name_${i}" style="width:100%">
+      </div>
+      <div>
+        ${i===0?'<label style="font-size:.73rem;color:var(--muted);display:block;margin-bottom:4px">จำนวน *</label>':''}
+        <input type="number" class="mo-input" placeholder="0" value="${item.qty}" oninput="prItems[${i}].qty=this.value" style="width:100%">
+      </div>
+      <div>
+        ${i===0?'<label style="font-size:.73rem;color:var(--muted);display:block;margin-bottom:4px">งบ (บาท)</label>':''}
+        <input type="number" class="mo-input" placeholder="0" value="${item.price}" oninput="prItems[${i}].price=this.value" style="width:100%">
+      </div>
+      <div style="padding-bottom:2px">
+        ${prItems.length>1?`<button onclick="removePrItem(${i})" style="background:rgba(255,107,107,.2);border:1px solid rgba(255,107,107,.4);color:var(--accent2);border-radius:6px;width:28px;height:32px;cursor:pointer;font-size:14px">✕</button>`:'<span></span>'}
+      </div>
+    </div>`).join('');
+
   document.getElementById('moTitle').textContent='➕ เพิ่ม PR ใหม่';
+  document.getElementById('moBody').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div><label style="font-size:.73rem;color:var(--muted);display:block;margin-bottom:4px">PR Date *</label>
+        <input id="pr_prDate" type="date" class="mo-input" style="width:100%;color-scheme:dark"></div>
+      <div><label style="font-size:.73rem;color:var(--muted);display:block;margin-bottom:4px">Track No. *</label>
+        <input id="pr_trackNo" type="text" placeholder="เช่น 69K0410016" class="mo-input" style="width:100%"></div>
+      <div><label style="font-size:.73rem;color:var(--muted);display:block;margin-bottom:4px">PR No. *</label>
+        <input id="pr_prNo" type="text" placeholder="เช่น 1102336802" class="mo-input" style="width:100%"></div>
+      <div><label style="font-size:.73rem;color:var(--muted);display:block;margin-bottom:4px">ระยะเวลาจัดส่ง (วัน)</label>
+        <input id="pr_deliveryDays" type="number" placeholder="30" value="30" class="mo-input" style="width:100%"></div>
+    </div>
+    <div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:12px">
+      <div style="font-size:.75rem;color:var(--muted);margin-bottom:10px;font-weight:600">รายการพัสดุ</div>
+      <div id="prItemsList">${itemsHtml}</div>
+      <button onclick="addPrItem()" style="background:rgba(79,255,176,.1);border:1px solid rgba(79,255,176,.3);color:var(--accent);border-radius:6px;padding:5px 14px;cursor:pointer;font-family:'Sarabun',sans-serif;font-size:.8rem;margin-top:4px">+ เพิ่มรายการ</button>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="closeMoDirect()" style="padding:8px 20px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Sarabun',sans-serif">ยกเลิก</button>
+      <button onclick="submitAddPr()" style="padding:8px 24px;border-radius:8px;border:none;background:var(--accent);color:#000;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">💾 บันทึก PR</button>
+    </div>`;
+  // set today
+  const n=new Date();
+  const inp=document.getElementById('pr_prDate');
+  if(inp) inp.value=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+  ensureInputStyle();
+}
+
+function addPrItem(){ prItems.push({code:'',name:'',qty:'',price:''}); renderAddPrModal(); }
+function removePrItem(i){ prItems.splice(i,1); renderAddPrModal(); }
+function autoFillPrItem(i,val){
+  const clean=String(val).replace(/-/g,'').trim();
+  const name=nameMap[clean]||'';
+  if(name){ prItems[i].name=name; const el=document.getElementById(`pr_name_${i}`); if(el) el.value=name; }
+}
+
+async function submitAddPr(){
+  const f=id=>document.getElementById(id)?.value?.trim()||'';
+  const prDateRaw=f('pr_prDate'), trackNo=f('pr_trackNo'), prNo=f('pr_prNo'), deliveryDays=f('pr_deliveryDays');
+  if(!prDateRaw||!trackNo||!prNo){ showToast('กรุณากรอก PR Date, Track No, PR No ให้ครบ',true); return; }
+  const validItems=prItems.filter(it=>it.code&&it.qty);
+  if(!validItems.length){ showToast('กรุณากรอกรหัสวัสดุและจำนวนอย่างน้อย 1 รายการ',true); return; }
+  // แปลงวันที่จาก yyyy-mm-dd → dd/mm/yyyy ค.ศ.
+  const [y,m,d]=prDateRaw.split('-');
+  const prDate=`${d}/${m}/${y}`;
+  const rows=validItems.map(it=>{
+    const total=it.price&&it.qty?(parseFloat(it.price)*parseFloat(it.qty)).toFixed(2):'';
+    return [prDate,trackNo,prNo,'','',deliveryDays,'',it.code.replace(/-/g,''),it.name||nameMap[it.code.replace(/-/g,'')]||'',it.qty,it.price,total,'','','','รอรับ','รอรับ'];
+  });
+  try{
+    const ok=await sheetsAppend('ขอซื้อ',rows);
+    if(ok){ closeMoDirect(); showToast(`เพิ่ม PR สำเร็จ ${rows.length} รายการ! กด Sync เพื่ออัปเดต`); }
+  }catch(e){ showToast('บันทึกไม่สำเร็จ: '+e.message,true); }
+}
+
+// ══ Update PR Modal (แก้ไขครบ) ═══════════════════════════════
+function openUpdateStatusMo(prId){
+  if(!gAccessToken){ showToast('กรุณา Login ก่อนครับ',true); return; }
+  const r=prData.find(d=>d.id===prId); if(!r) return;
+  // หา rows อื่นที่มี PO No เดียวกัน
+  const samePO=r.poNo&&r.poNo!=='–'&&r.poNo!==''
+    ? prData.filter(d=>d.poNo===r.poNo&&d.id!==r.id)
+    : [];
+  const samePOHtml=samePO.length?`<div style="font-size:.73rem;color:var(--accent3);margin-top:4px">⚠ มีอีก ${samePO.length} รายการที่ใช้ PO ${r.poNo} — <label><input type="checkbox" id="upd_syncPO" checked style="accent-color:var(--accent)"> อัปเดตสถานะทุก row นี้ด้วย</label></div>`:'';
+
+  document.getElementById('moTitle').textContent='✏️ แก้ไข PR — '+r.prNo;
+  document.getElementById('moBody').innerHTML=`
+    <div class="mf full" style="margin-bottom:10px"><label>รายการพัสดุ</label><div class="vname">${r.itemName||'–'} <span style="color:var(--muted);font-size:.78rem">(${r.itemCode})</span></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><label style="font-size:.73rem;color:var(--muted);display:block;margin-bottom:4px">PO No.</label>
+        <input id="upd_poNo" type="text" value="${r.poNo||''}" class="mo-input" style="width:100%"></div>
+      <div><label style="font-size:.73rem;color:var(--muted);display:block;margin-bottom:4px">PO Date</label>
+        <input id="upd_poDate" type="date" value="${dateToInput(r.poDate)}" class="mo-input" style="width:100%;color-scheme:dark"></div>
+      <div><label style="font-size:.73rem;color:var(--muted);display:block;margin-bottom:4px">สถานะ 103</label>
+        <select id="upd_s103" class="mo-input" style="width:100%">
+          <option value="รอรับ" ${r.s103==='รอรับ'?'selected':''}>รอรับ</option>
+          <option value="รับแล้ว" ${r.s103==='รับแล้ว'?'selected':''}>รับแล้ว</option>
+          <option value="ยกเลิก" ${r.s103==='ยกเลิก'?'selected':''}>ยกเลิก</option>
+        </select></div>
+      <div><label style="font-size:.73rem;color:var(--muted);display:block;margin-bottom:4px">วันที่ลงพัสดุ (103)</label>
+        <input id="upd_receiveDate" type="date" value="${dateToInput(r.receiveDate)}" class="mo-input" style="width:100%;color-scheme:dark"></div>
+      <div><label style="font-size:.73rem;color:var(--muted);display:block;margin-bottom:4px">สถานะ 105</label>
+        <select id="upd_s105" class="mo-input" style="width:100%">
+          <option value="รอรับ" ${r.s105==='รอรับ'?'selected':''}>รอรับ</option>
+          <option value="รับแล้ว" ${r.s105==='รับแล้ว'?'selected':''}>รับแล้ว</option>
+          <option value="ยกเลิก" ${r.s105==='ยกเลิก'?'selected':''}>ยกเลิก</option>
+        </select></div>
+      <div><label style="font-size:.73rem;color:var(--muted);display:block;margin-bottom:4px">วันที่รับบัญชี (105)</label>
+        <input id="upd_accountDate" type="date" value="${dateToInput(r.accountDate)}" class="mo-input" style="width:100%;color-scheme:dark"></div>
+      <div style="grid-column:1/-1"><label style="font-size:.73rem;color:var(--muted);display:block;margin-bottom:4px">หมายเหตุ</label>
+        <input id="upd_note" type="text" value="${r.note||''}" placeholder="หมายเหตุ..." class="mo-input" style="width:100%"></div>
+    </div>
+    ${samePOHtml}
+    <div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="closeMoDirect()" style="padding:8px 20px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Sarabun',sans-serif">ยกเลิก</button>
+      <button onclick="submitUpdateStatus(${prId})" style="padding:8px 24px;border-radius:8px;border:none;background:var(--accent);color:#000;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">💾 บันทึก</button>
+    </div>`;
+  ensureInputStyle();
+  document.getElementById('mo').classList.add('open');
+}
+
+async function submitUpdateStatus(prId){
+  const r=prData.find(d=>d.id===prId); if(!r) return;
+  const poNo=document.getElementById('upd_poNo').value.trim();
+  const poDate=dateInputVal('upd_poDate');
+  const s103=document.getElementById('upd_s103').value;
+  const s105=document.getElementById('upd_s105').value;
+  const receiveDate=dateInputVal('upd_receiveDate');
+  const accountDate=dateInputVal('upd_accountDate');
+  const note=document.getElementById('upd_note').value.trim();
+  const syncPO=document.getElementById('upd_syncPO')?.checked ?? false;
+  try{
+    const res=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_PR_ID}/values/${encodeURIComponent('ขอซื้อ')}?key=${API_KEY}`);
+    const json=await res.json();
+    const rows=json.values||[];
+    // หา rows ที่ต้องอัปเดต
+    const targets=[];
+    rows.forEach((row,i)=>{
+      if(i===0) return;
+      const rowTrack=String(row[1]||'').trim();
+      const rowPrNo=String(row[2]||'').trim();
+      const rowCode=String(row[7]||'').replace(/-/g,'').trim();
+      if(rowTrack===r.trackNo&&rowPrNo===r.prNo&&rowCode===r.itemCode) targets.push(i+1);
+      // ถ้า syncPO และ PO No เดียวกัน
+      else if(syncPO&&poNo&&String(row[4]||'').trim()===poNo) targets.push(i+1);
+    });
+    if(!targets.length){ showToast('ไม่พบแถวใน Google Sheets',true); return; }
+    for(const rowIdx of targets){
+      await sheetsUpdate(`ขอซื้อ!D${rowIdx}:E${rowIdx}`,[[poDate,poNo]]);
+      await sheetsUpdate(`ขอซื้อ!M${rowIdx}:N${rowIdx}`,[[receiveDate,accountDate]]);
+      await sheetsUpdate(`ขอซื้อ!P${rowIdx}:Q${rowIdx}`,[[s103,s105]]);
+      if(note) await sheetsUpdate(`ขอซื้อ!Z${rowIdx}`,[[note]]);
+    }
+    // update local prData
+    const updateIds=new Set([r.id]);
+    if(syncPO&&poNo) prData.filter(d=>d.poNo===poNo).forEach(d=>updateIds.add(d.id));
+    prData.forEach(d=>{
+      if(!updateIds.has(d.id)) return;
+      d.poNo=poNo; d.poDate=poDate; d.s103=s103; d.s105=s105;
+      d.receiveDate=receiveDate; d.accountDate=accountDate; d.note=note;
+    });
+    renderPr(); renderPrStats(); closeMoDirect();
+    showToast(`อัปเดตสำเร็จ ${targets.length} แถว ✓`);
+  }catch(e){ showToast('อัปเดตไม่สำเร็จ: '+e.message,true); }
+}
+
+function ensureInputStyle(){
+  if(!document.getElementById('moInputStyle')){
+    const s=document.createElement('style'); s.id='moInputStyle';
+    s.textContent='.mo-input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-family:"Sarabun",sans-serif;font-size:.85rem;outline:none}.mo-input:focus{border-color:var(--accent)}';
+    document.head.appendChild(s);
+  }
+}
+
+// ══ Inline Edit ════════════════════════════════════════════════
+async function inlineUpdate(prId, field, rawVal, type='text'){
+  if(!gAccessToken){ showToast('กรุณา Login ก่อนครับ',true); return; }
+  const r=prData.find(d=>d.id===prId); if(!r) return;
+  // แปลงวันที่ yyyy-mm-dd → dd/mm/yyyy ค.ศ.
+  let val=rawVal;
+  if(type==='date'&&rawVal){
+    const [y,m,d]=rawVal.split('-');
+    val=`${d}/${m}/${y}`;
+  }
+  // col mapping
+  const colMap={poNo:'E',poDate:'D',s103:'P',s105:'Q',receiveDate:'M',accountDate:'N',note:'Z'};
+  const col=colMap[field]; if(!col) return;
+  try{
+    // หา row index ใน Sheets
+    const res=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_PR_ID}/values/${encodeURIComponent('ขอซื้อ')}?key=${API_KEY}`);
+    const json=await res.json();
+    const rows=json.values||[];
+    const targets=[];
+    rows.forEach((row,i)=>{
+      if(i===0) return;
+      if(String(row[1]||'').trim()===r.trackNo&&String(row[2]||'').trim()===r.prNo&&String(row[7]||'').replace(/-/g,'').trim()===r.itemCode)
+        targets.push(i+1);
+    });
+    // ถ้าเป็น s103/s105 และมี PO No → sync ทุก row ที่ PO เดียวกัน
+    if((field==='s103'||field==='s105')&&r.poNo&&r.poNo!=='–'&&r.poNo!==''){
+      rows.forEach((row,i)=>{
+        if(i===0) return;
+        if(String(row[4]||'').trim()===r.poNo&&!targets.includes(i+1)) targets.push(i+1);
+      });
+    }
+    if(!targets.length){ showToast('ไม่พบแถวใน Sheets',true); return; }
+    for(const rowIdx of targets){
+      await sheetsUpdate(`ขอซื้อ!${col}${rowIdx}`,[[val]]);
+    }
+    // update local prData
+    const syncIds=new Set(targets.map((_,i)=>i)); // simplify: update all matching
+    // Update all rows with same trackNo+prNo+itemCode
+    prData.forEach(d=>{
+      if(d.trackNo===r.trackNo&&d.prNo===r.prNo&&d.itemCode===r.itemCode) d[field]=val;
+      // sync status for same PO
+      if((field==='s103'||field==='s105')&&r.poNo&&d.poNo===r.poNo) d[field]=val;
+    });
+    renderPr(); renderPrStats();
+    showToast(`บันทึก ${field} สำเร็จ`+(targets.length>1?` (${targets.length} แถว)`:''));
+  }catch(e){ showToast('บันทึกไม่สำเร็จ: '+e.message,true); }
+}
+
+// ══ Theme Toggle ══════════════════════════════════════════════
+function toggleTheme(){
   document.getElementById('moBody').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="mf"><label>PR Date *</label><input id="pr_prDate" type="text" placeholder="dd/mm/yyyy" value="${today}" class="mo-input" style="width:100%"></div>
@@ -2138,7 +2431,7 @@ function openAddPrModal(){
       <div class="mf"><label>วันที่รับบัญชี <span style="color:var(--muted);font-size:.72rem">(กรอกภายหลัง)</span></label><input id="pr_accountDate" type="text" placeholder="dd/mm/yyyy" class="mo-input" style="width:100%"></div>
     </div>
     <div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end">
-      <button onclick="closeMo()" style="padding:8px 20px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Sarabun',sans-serif">ยกเลิก</button>
+      <button onclick="closeMoDirect()" style="padding:8px 20px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Sarabun',sans-serif">ยกเลิก</button>
       <button onclick="submitAddPr()" style="padding:8px 24px;border-radius:8px;border:none;background:var(--accent);color:#000;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">บันทึก PR</button>
     </div>`;
   // Add CSS for inputs
@@ -2175,7 +2468,7 @@ async function submitAddPr(){
   try{
     const ok=await sheetsAppend('ขอซื้อ',[row]);
     if(ok){
-      closeMo();
+      closeMoDirect();
       showToast('เพิ่ม PR สำเร็จ! กด Sync เพื่ออัปเดตข้อมูล');
     }
   }catch(e){ showToast('บันทึกไม่สำเร็จ: '+e.message,true); }
@@ -2219,7 +2512,7 @@ function openUpdateStatusMo(prId){
       </div>
     </div>
     <div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end">
-      <button onclick="closeMo()" style="padding:8px 20px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Sarabun',sans-serif">ยกเลิก</button>
+      <button onclick="closeMoDirect()" style="padding:8px 20px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Sarabun',sans-serif">ยกเลิก</button>
       <button onclick="submitUpdateStatus(${prId})" style="padding:8px 24px;border-radius:8px;border:none;background:var(--accent);color:#000;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">บันทึก</button>
     </div>`;
   document.getElementById('mo').classList.add('open');
@@ -2253,7 +2546,7 @@ async function submitUpdateStatus(prId){
     // update local prData
     r.s103=s103; r.s105=s105; r.receiveDate=receiveDate; r.accountDate=accountDate; r.note=note;
     renderPr(); renderPrStats();
-    closeMo();
+    closeMoDirect();
     showToast('อัปเดตสถานะสำเร็จ ✓');
   }catch(e){ showToast('อัปเดตไม่สำเร็จ: '+e.message,true); }
 }
