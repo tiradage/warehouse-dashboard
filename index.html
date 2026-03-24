@@ -237,6 +237,7 @@ window.loadCloudData = async function(){
     if(cn43nRaw && zmbRaw) processZmb();
     else if(mb52Raw){ buildInvFilters(); renderInv(); }
     if(mb52Raw||cn43nRaw||zmbRaw) showToast('โหลดข้อมูล cloud สำเร็จ ✓');
+    fetchBorrow();
     else showToast('ยังไม่มีข้อมูลใน cloud — กรุณาอัปโหลดไฟล์');
   }catch(e){
     showToast('โหลด cloud ไม่สำเร็จ: '+e.message, true);
@@ -635,6 +636,8 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--muted
     <button class="tab-btn" onclick="switchTab('pr')">📋 ข้อมูลจัดซื้อ (PR/PO)</button>
     <button class="tab-btn" onclick="switchTab('lt')">⏱ Lead Time Analysis</button>
     <button class="tab-btn" onclick="switchTab('zmb')">📊 ความต้องการพัสดุ (ZMB25)</button>
+    <button class="tab-btn" onclick="switchTab('borrow')">📤 ยืมพัสดุ</button>
+    <button class="tab-btn" onclick="switchTab('concrete')">🏗 ติดตามคอนกรีต</button>
   </div>
 
   <!-- ══ TAB 1: Inventory ══ -->
@@ -876,6 +879,106 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--muted
     </div>
   </div>
 
+  <!-- ══ TAB 5: ยืมพัสดุ ══ -->
+  <div class="tab-panel" id="tab-borrow">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+      <div class="stats" id="borrowStatsRow" style="flex:1;margin-bottom:0"></div>
+      <div style="display:flex;gap:8px">
+        <button class="edit-only btn btn-ghost" id="borrowUploadBtn" style="display:none;border-color:rgba(167,139,250,.4);color:var(--purple)" onclick="document.getElementById('borrowImgInput').click()">
+          📷 อัปโหลดภาพเอกสารยืม
+        </button>
+        <input type="file" id="borrowImgInput" accept="image/*" style="display:none" onchange="handleBorrowImage(event)">
+      </div>
+    </div>
+    <!-- Summary table by item code -->
+    <div class="sec-title" style="margin-bottom:10px">สรุปยอดยืมต่อรหัสพัสดุ</div>
+    <div class="tw" style="margin-bottom:20px">
+      <div class="ts">
+        <table>
+          <thead><tr>
+            <th>รหัสวัสดุ</th>
+            <th>ชื่อพัสดุ</th>
+            <th>ยืมรวม (จำนวน)</th>
+            <th>ครั้งที่ยืม</th>
+            <th>ดำเนินการแล้ว</th>
+            <th>รอดำเนินการ</th>
+          </tr></thead>
+          <tbody id="borrowSummaryBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <!-- Detail table -->
+    <div class="sec-title" style="margin-bottom:10px">รายละเอียดการยืมทั้งหมด</div>
+    <div class="toolbar" style="margin-bottom:10px">
+      <div class="sw">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="borrowSearch" placeholder="ค้นหารหัส / ชื่อ / ผู้ยืม…" oninput="renderBorrow()">
+      </div>
+      <select id="borrowStatusFilter" onchange="renderBorrow()" style="font-size:.83rem">
+        <option value="">ทุกสถานะ</option>
+        <option value="ยังไม่ดำเนินการ">ยังไม่ดำเนินการ</option>
+        <option value="ดำเนินการแล้ว">ดำเนินการแล้ว</option>
+      </select>
+      <button class="btn btn-ghost" onclick="exportBorrowCSV()">⬇ ส่งออก CSV</button>
+      <span class="cnt" id="borrowCount"></span>
+    </div>
+    <div class="tw">
+      <div class="ts">
+        <table>
+          <thead><tr>
+            <th>รหัสวัสดุ</th>
+            <th>ชื่อพัสดุ</th>
+            <th>จำนวน</th>
+            <th>ผู้ยืม</th>
+            <th>รหัสพนักงาน</th>
+            <th>ผู้ควบคุมพัสดุ</th>
+            <th>วันที่</th>
+            <th>สถานะ</th>
+            <th>ดำเนินการโดย</th>
+            <th style="width:80px">อัปเดต</th>
+          </tr></thead>
+          <tbody id="borrowBody"></tbody>
+        </table>
+      </div>
+      <div class="pag" id="borrowPag" style="display:none"><span id="borrowPi"></span><div class="pbtns" id="borrowPbtns"></div></div>
+    </div>
+  </div>
+
+  <!-- ══ TAB 6: ติดตามคอนกรีต ══ -->
+  <div class="tab-panel" id="tab-concrete">
+    <div class="stats" id="concreteStatsRow"></div>
+    <div class="toolbar" style="margin-bottom:14px;margin-top:16px">
+      <div class="sw">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="concreteSearch" placeholder="ค้นหา WBS / ชื่องาน…" oninput="renderConcrete()">
+      </div>
+      <select id="concreteGroupFilter" onchange="renderConcrete()" style="font-size:.83rem">
+        <option value="">ทุกกลุ่ม</option>
+      </select>
+      <button class="btn btn-ghost" onclick="exportConcreteCSV()">⬇ ส่งออก CSV</button>
+      <span class="cnt" id="concreteCount"></span>
+    </div>
+    <div class="tw">
+      <div class="ts">
+        <table>
+          <thead><tr>
+            <th data-tbl="concrete" data-col="code">รหัสวัสดุ <span class="si">↕</span></th>
+            <th data-tbl="concrete" data-col="name">ชื่อวัสดุ <span class="si">↕</span></th>
+            <th data-tbl="concrete" data-col="wbs">องค์ประกอบ WBS <span class="si">↕</span></th>
+            <th data-tbl="concrete" data-col="wbsName">ชื่องาน <span class="si">↕</span></th>
+            <th data-tbl="concrete" data-col="network">โครงข่าย <span class="si">↕</span></th>
+            <th data-tbl="concrete" data-col="supervisor">ชื่อช่างควบคุมงาน <span class="si">↕</span></th>
+            <th data-tbl="concrete" data-col="demand">ความต้องการ <span class="si">↕</span></th>
+            <th data-tbl="concrete" data-col="status">สถานะ <span class="si">↕</span></th>
+            <th data-tbl="concrete" data-col="reqDate">วันที่ความต้องการ <span class="si">↕</span></th>
+          </tr></thead>
+          <tbody id="concreteBody"></tbody>
+        </table>
+      </div>
+      <div class="pag"><span id="concretePi"></span><div class="pbtns" id="concretePbtns"></div></div>
+    </div>
+  </div>
+
 </main>
 
 <!-- Modal -->
@@ -919,10 +1022,15 @@ let msState = { wh: new Set([...DEFAULT_WH]), batch: new Set(['N','']), s103: ne
 
 // ══ Tab switching ═════════════════════════════════════════════
 function switchTab(id){
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['inv','pr','lt','zmb'][i]===id));
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['inv','pr','lt','zmb','borrow','concrete'][i]===id));
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+id));
   if(id==='lt') renderLt();
   if(id==='zmb') renderZmb();
+  if(id==='borrow'){
+    if(!_borrowLoaded){ _borrowLoaded=true; fetchBorrow(); }
+    else renderBorrow();
+  }
+  if(id==='concrete'){ buildConcreteData(); renderConcrete(); }
 }
 
 // ══ Auth UI Functions ═════════════════════════════════════════
@@ -1035,6 +1143,8 @@ function applyPerms(){
   document.querySelectorAll('.upload-btn.edit-only').forEach(el=>el.style.display=canUp?'':'none');
   const addBtn = document.getElementById('addPrBtn');
   if(addBtn) addBtn.style.display=canAdd?'':'none';
+  const borrowBtn = document.getElementById('borrowUploadBtn');
+  if(borrowBtn) borrowBtn.style.display=canUp?'':'none';
   const editBtn = document.getElementById('editModeBtn');
   if(editBtn) editBtn.style.display=canEdit?'':'none';
 
@@ -3169,7 +3279,492 @@ async function inlineUpdate(prId, field, rawVal, type='text'){
   }catch(e){ showToast('บันทึกไม่สำเร็จ: '+e.message,true); }
 }
 
-// ══ Theme Toggle ══════════════════════════════════════════════
+// ══ ยืมพัสดุ (Borrow) ════════════════════════════════════════
+const SHEET_BORROW_NAME = 'ยืมพัสดุ';
+let borrowData = []; // [{id,code,name,qty,borrower,empId,custodian,date,status,action,rowIdx}]
+let borrowPage = 1;
+const BORROW_PS = 20;
+
+// โหลดข้อมูลจาก Google Sheets
+async function fetchBorrow(){
+  try{
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_NAME_ID}/values/${encodeURIComponent(SHEET_BORROW_NAME)}?key=${API_KEY}`;
+    const res = await fetch(url);
+    if(!res.ok) return;
+    const json = await res.json();
+    const rows = (json.values||[]).slice(1);
+    borrowData = rows.map((r,i)=>({
+      id: i,
+      rowIdx: i+2, // 1-based, skip header
+      code:     String(r[0]||'').replace(/-/g,'').trim(),
+      name:     r[1]||'',
+      qty:      r[2]||'',
+      borrower: r[3]||'',
+      empId:    r[4]||'',
+      custodian:r[5]||'',
+      date:     r[6]||'',
+      status:   r[7]||'ยังไม่ดำเนินการ',
+      action:   r[8]||'ยังไม่ดำเนินการ',
+    })).filter(r=>r.code);
+    renderBorrow();
+  }catch(e){ console.error('fetchBorrow',e); }
+}
+
+function filteredBorrow(){
+  const q = (document.getElementById('borrowSearch')?.value||'').toLowerCase();
+  const st = document.getElementById('borrowStatusFilter')?.value||'';
+  return borrowData.filter(r=>{
+    const tm = !q || r.code.includes(q) || r.name.toLowerCase().includes(q) || r.borrower.toLowerCase().includes(q) || r.empId.includes(q);
+    const sm = !st || r.status===st;
+    return tm&&sm;
+  });
+}
+
+function renderBorrow(){
+  // Summary
+  const summary = {};
+  borrowData.forEach(r=>{
+    if(!summary[r.code]) summary[r.code]={code:r.code,name:r.name||nameMap[r.code]||'',total:0,count:0,done:0};
+    const n = parseFloat(String(r.qty).replace(/,/g,''))||0;
+    summary[r.code].total += n;
+    summary[r.code].count++;
+    if(r.status==='ดำเนินการแล้ว') summary[r.code].done++;
+  });
+  document.getElementById('borrowSummaryBody').innerHTML = Object.values(summary).map(s=>`
+    <tr style="cursor:pointer" onclick="filterBorrowByCode('${s.code}')">
+      <td class="mono" style="font-weight:600;color:var(--text)">${s.code}</td>
+      <td style="font-weight:500">${s.name}</td>
+      <td class="mono" style="color:var(--accent3);font-weight:600">${s.total.toLocaleString()}</td>
+      <td class="mono">${s.count}</td>
+      <td class="mono" style="color:var(--accent)">${s.done}</td>
+      <td class="mono" style="color:${s.count-s.done>0?'var(--accent2)':'var(--muted)'}">${s.count-s.done}</td>
+    </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">ยังไม่มีข้อมูล</td></tr>';
+
+  // Stats cards
+  const total = borrowData.length;
+  const pending = borrowData.filter(r=>r.status==='ยังไม่ดำเนินการ').length;
+  document.getElementById('borrowStatsRow').innerHTML=`
+    <div class="sc b"><div class="sc-label">รายการยืมทั้งหมด</div><div class="sc-val">${total}</div></div>
+    <div class="sc r"><div class="sc-label">รอดำเนินการ</div><div class="sc-val">${pending}</div></div>
+    <div class="sc g"><div class="sc-label">ดำเนินการแล้ว</div><div class="sc-val">${total-pending}</div></div>`;
+
+  // Detail
+  const rows = filteredBorrow();
+  const pages = Math.max(1,Math.ceil(rows.length/BORROW_PS));
+  if(borrowPage>pages) borrowPage=pages;
+  const sl = rows.slice((borrowPage-1)*BORROW_PS, borrowPage*BORROW_PS);
+  document.getElementById('borrowCount').textContent = `${rows.length} รายการ`;
+  document.getElementById('borrowBody').innerHTML = sl.map((r,i)=>{
+    const stCls = r.status==='ดำเนินการแล้ว'?'done':'pending';
+    const canEdit = gAccessToken||(window.userPerms&&window.userPerms.canEditPr);
+    return `<tr>
+      <td class="mono" style="font-weight:600">${r.code}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${r.name||nameMap[r.code]||'–'}</td>
+      <td class="mono">${r.qty||'–'}</td>
+      <td>${r.borrower||'–'}</td>
+      <td class="mono">${r.empId||'–'}</td>
+      <td>${r.custodian||'–'}</td>
+      <td class="mono" style="font-size:.76rem">${r.date||'–'}</td>
+      <td><span class="badge ${stCls}">${r.status}</span></td>
+      <td style="font-size:.78rem;color:var(--muted)">${r.action}</td>
+      <td>${canEdit?`<button onclick="openBorrowUpdateMo(${r.id})" style="padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--blue);cursor:pointer;font-size:.73rem;font-family:'Sarabun',sans-serif">แก้ไข</button>`:'–'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--muted)">ไม่พบข้อมูล</td></tr>';
+
+  const pagEl = document.getElementById('borrowPag');
+  pagEl.style.display = rows.length>BORROW_PS?'flex':'none';
+  renderPag('borrowPi','borrowPbtns',borrowPage,pages,rows.length,p=>{borrowPage=p;renderBorrow();});
+}
+
+function filterBorrowByCode(code){
+  document.getElementById('borrowSearch').value = code;
+  renderBorrow();
+}
+
+function openBorrowUpdateMo(id){
+  if(!gAccessToken&&!(window.userPerms&&window.userPerms.canEditPr)){ showToast('ไม่มีสิทธิ์แก้ไข',true); return; }
+  const r = borrowData.find(d=>d.id===id); if(!r) return;
+  document.getElementById('moTitle').textContent = '📤 อัปเดตการยืมพัสดุ';
+  document.getElementById('moBody').innerHTML=`
+    <div style="margin-bottom:16px">
+      <div style="font-size:.85rem;font-weight:600;color:var(--text);margin-bottom:4px">${r.code} — ${r.name||nameMap[r.code]||''}</div>
+      <div style="font-size:.78rem;color:var(--muted)">ผู้ยืม: ${r.borrower} (${r.empId}) | จำนวน: ${r.qty}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><label style="font-size:.72rem;color:var(--muted);display:block;margin-bottom:4px">ผู้ยืม</label>
+        <input id="bupd_borrower" type="text" value="${r.borrower}" class="mo-input" style="width:100%"></div>
+      <div><label style="font-size:.72rem;color:var(--muted);display:block;margin-bottom:4px">รหัสพนักงาน</label>
+        <input id="bupd_empId" type="text" value="${r.empId}" class="mo-input" style="width:100%"></div>
+      <div><label style="font-size:.72rem;color:var(--muted);display:block;margin-bottom:4px">ผู้ควบคุมพัสดุ</label>
+        <input id="bupd_custodian" type="text" value="${r.custodian}" class="mo-input" style="width:100%"></div>
+      <div><label style="font-size:.72rem;color:var(--muted);display:block;margin-bottom:4px">สถานะการยืม</label>
+        <select id="bupd_status" class="mo-input" style="width:100%">
+          <option value="ยังไม่ดำเนินการ" ${r.status==='ยังไม่ดำเนินการ'?'selected':''}>ยังไม่ดำเนินการ</option>
+          <option value="ดำเนินการแล้ว" ${r.status==='ดำเนินการแล้ว'?'selected':''}>ดำเนินการแล้ว</option>
+        </select></div>
+      <div style="grid-column:1/-1"><label style="font-size:.72rem;color:var(--muted);display:block;margin-bottom:4px">ดำเนินการโดย</label>
+        <select id="bupd_action" class="mo-input" style="width:100%">
+          <option value="ยังไม่ดำเนินการ" ${r.action==='ยังไม่ดำเนินการ'?'selected':''}>ยังไม่ดำเนินการ</option>
+          <option value="นำพัสดุมาคืน" ${r.action==='นำพัสดุมาคืน'?'selected':''}>นำพัสดุมาคืน</option>
+          <option value="เบิกพัสดุย้อนหลัง" ${r.action==='เบิกพัสดุย้อนหลัง'?'selected':''}>เบิกพัสดุย้อนหลัง</option>
+        </select></div>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="closeMoDirect()" style="padding:8px 20px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Sarabun',sans-serif">ยกเลิก</button>
+      <button onclick="submitBorrowUpdate(${id})" style="padding:8px 24px;border-radius:8px;border:none;background:var(--accent);color:#000;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">💾 บันทึก</button>
+    </div>`;
+  ensureInputStyle();
+  document.getElementById('mo').classList.add('open');
+}
+
+async function submitBorrowUpdate(id){
+  const r = borrowData.find(d=>d.id===id); if(!r) return;
+  const borrower  = document.getElementById('bupd_borrower').value.trim();
+  const empId     = document.getElementById('bupd_empId').value.trim();
+  const custodian = document.getElementById('bupd_custodian').value.trim();
+  const status    = document.getElementById('bupd_status').value;
+  const action    = document.getElementById('bupd_action').value;
+  try{
+    await sheetsUpdate(`${SHEET_BORROW_NAME}!D${r.rowIdx}:I${r.rowIdx}`,[[borrower,empId,custodian,r.date,status,action]]);
+    Object.assign(r,{borrower,empId,custodian,status,action});
+    renderBorrow(); closeMoDirect();
+    showToast('อัปเดตสำเร็จ ✓');
+  }catch(e){ showToast('บันทึกไม่สำเร็จ: '+e.message,true); }
+}
+
+// OCR ด้วย Google Vision API
+async function handleBorrowImage(event){
+  const file = event.target.files[0]; if(!file) return;
+  showToast('กำลังอ่านภาพเอกสาร…');
+  const reader = new FileReader();
+  reader.onload = async e => {
+    const base64 = e.target.result.split(',')[1];
+    try{
+      // 1. ส่งภาพไปให้ Google Vision OCR
+      const visionRes = await fetch(
+        `https://vision.googleapis.com/v1/images:annotate?key=${API_KEY}`,
+        {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            requests:[{
+              image:{content: base64},
+              features:[{type:'TEXT_DETECTION',maxResults:1}]
+            }]
+          })
+        }
+      );
+      const visionData = await visionRes.json();
+      const rawText = visionData.responses?.[0]?.fullTextAnnotation?.text || '';
+      if(!rawText){ showToast('ไม่พบข้อความในภาพ กรุณาลองใหม่',true); event.target.value=''; return; }
+
+      // 2. Parse ข้อความที่ได้จาก OCR
+      const items = parseBorrowText(rawText);
+      if(!items.length){
+        // ไม่ parse ได้อัตโนมัติ → เปิด manual entry
+        openBorrowManualMo(rawText);
+      } else {
+        openBorrowPreviewMo(items);
+      }
+    }catch(e){ showToast('OCR ไม่สำเร็จ: '+e.message, true); }
+    event.target.value='';
+  };
+  reader.readAsDataURL(file);
+}
+
+// Parse ข้อความจาก Vision OCR
+function parseBorrowText(text){
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  const items = [];
+  // หารหัสวัสดุ (10 หลัก หรือ มีขีด เช่น 1030-010-102)
+  const codeReg = /\b(\d{4}[-.]?\d{3}[-.]?\d{3,4})\b/g;
+  const numReg  = /\b(\d+(?:\.\d+)?)\b/;
+  let borrower='', empId='', custodian='';
+  // หาชื่อผู้ยืม/รหัสพนักงาน จากคำที่มักอยู่ใกล้ "ผู้ยืม" "ชื่อ"
+  lines.forEach(l=>{
+    if(l.includes('ผู้ยืม')||l.includes('ชื่อผู้ยืม')){
+      borrower = l.replace(/ผู้ยืม|ชื่อผู้ยืม|:/g,'').trim();
+    }
+    if(l.includes('รหัส')||l.includes('เลขที่')){
+      const m = l.match(/\d{5,7}/);
+      if(m) empId = m[0];
+    }
+    if(l.includes('ผู้ควบคุม')||l.includes('ผู้ดูแล')){
+      custodian = l.replace(/ผู้ควบคุม.*?:|ผู้ดูแล.*?:/g,'').trim();
+    }
+  });
+  // หารายการพัสดุ
+  const found = new Set();
+  lines.forEach(l=>{
+    const codes = [...l.matchAll(codeReg)];
+    codes.forEach(m=>{
+      const code = m[1].replace(/[-.\s]/g,'');
+      if(found.has(code)) return;
+      found.add(code);
+      // หาจำนวนในบรรทัดเดียวกัน
+      const nums = l.replace(m[1],'').match(/\d+(?:\.\d+)?/g)||[];
+      const qty = nums.find(n=>parseFloat(n)>0&&parseFloat(n)<100000)||'';
+      items.push({code, qty, borrower, empId, custodian});
+    });
+  });
+  return items;
+}
+
+// กรณีที่ parse ไม่ได้ → เปิด modal ให้ดู OCR text และกรอกเอง
+function openBorrowManualMo(rawText){
+  document.getElementById('moTitle').textContent = '📋 กรอกข้อมูลจากเอกสารยืม';
+  document.getElementById('moBody').innerHTML=`
+    <div style="margin-bottom:12px">
+      <div style="font-size:.75rem;color:var(--muted);margin-bottom:6px">ข้อความที่อ่านได้จากภาพ (ใช้อ้างอิง):</div>
+      <div style="background:var(--surface2);border-radius:6px;padding:10px;font-size:.75rem;font-family:'IBM Plex Mono',monospace;max-height:120px;overflow-y:auto;color:var(--muted);white-space:pre-wrap">${rawText.slice(0,600)}${rawText.length>600?'…':''}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div><label style="font-size:.72rem;color:var(--muted);display:block;margin-bottom:4px">ผู้ยืม</label>
+        <input id="bm_borrower" type="text" class="mo-input" style="width:100%"></div>
+      <div><label style="font-size:.72rem;color:var(--muted);display:block;margin-bottom:4px">รหัสพนักงาน</label>
+        <input id="bm_empid" type="text" class="mo-input" style="width:100%"></div>
+      <div style="grid-column:1/-1"><label style="font-size:.72rem;color:var(--muted);display:block;margin-bottom:4px">ผู้ควบคุมพัสดุ</label>
+        <input id="bm_custodian" type="text" class="mo-input" style="width:100%"></div>
+    </div>
+    <div id="bm_items">
+      <div style="font-size:.75rem;color:var(--muted);margin-bottom:6px;font-weight:600">รายการพัสดุ</div>
+      <div id="bm_itemsList"></div>
+      <button onclick="addBorrowManualItem()" style="background:rgba(79,255,176,.1);border:1px solid rgba(79,255,176,.3);color:var(--accent);border-radius:6px;padding:4px 12px;cursor:pointer;font-family:'Sarabun',sans-serif;font-size:.8rem;margin-top:6px">+ เพิ่มรายการ</button>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="closeMoDirect()" style="padding:8px 20px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Sarabun',sans-serif">ยกเลิก</button>
+      <button onclick="saveBorrowManual()" style="padding:8px 24px;border-radius:8px;border:none;background:var(--accent);color:#000;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">💾 บันทึก</button>
+    </div>`;
+  ensureInputStyle();
+  window._bmItems = [{code:'',qty:''}];
+  renderBorrowManualItems();
+  document.getElementById('mo').classList.add('open');
+}
+
+let _bmItems = [];
+function renderBorrowManualItems(){
+  document.getElementById('bm_itemsList').innerHTML = _bmItems.map((it,i)=>`
+    <div style="display:grid;grid-template-columns:140px 1fr 80px 28px;gap:6px;margin-bottom:6px;align-items:center">
+      <input type="text" class="mo-input" placeholder="รหัสวัสดุ" value="${it.code}"
+        oninput="_bmItems[${i}].code=this.value.replace(/-/g,'');document.getElementById('bm_name_${i}').textContent=nameMap[this.value.replace(/-/g,'')]||'–'"
+        style="font-size:.78rem">
+      <span id="bm_name_${i}" style="font-size:.76rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis">${nameMap[it.code]||'–'}</span>
+      <input type="text" class="mo-input" placeholder="จำนวน" value="${it.qty}"
+        oninput="_bmItems[${i}].qty=this.value" style="font-size:.78rem">
+      ${_bmItems.length>1?`<button onclick="_bmItems.splice(${i},1);renderBorrowManualItems()" style="background:rgba(255,107,107,.2);border:1px solid rgba(255,107,107,.4);color:var(--accent2);border-radius:4px;width:26px;height:26px;cursor:pointer;font-size:12px">✕</button>`:'<span></span>'}
+    </div>`).join('');
+}
+function addBorrowManualItem(){ _bmItems.push({code:'',qty:''}); renderBorrowManualItems(); }
+
+async function saveBorrowManual(){
+  const borrower  = document.getElementById('bm_borrower').value.trim();
+  const empId     = document.getElementById('bm_empid').value.trim();
+  const custodian = document.getElementById('bm_custodian').value.trim();
+  const today = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'2-digit',day:'2-digit'});
+  const rows = _bmItems.filter(it=>it.code&&it.qty).map(it=>[
+    it.code.replace(/-/g,''), nameMap[it.code.replace(/-/g,'')]||'',
+    it.qty, borrower, empId, custodian, today, 'ยังไม่ดำเนินการ', 'ยังไม่ดำเนินการ'
+  ]);
+  if(!rows.length){ showToast('กรุณากรอกรหัสวัสดุและจำนวนอย่างน้อย 1 รายการ',true); return; }
+  try{
+    const ok = await sheetsAppend(SHEET_BORROW_NAME, rows);
+    if(ok){ closeMoDirect(); showToast(`บันทึก ${rows.length} รายการสำเร็จ ✓`); fetchBorrow(); }
+  }catch(e){ showToast('บันทึกไม่สำเร็จ: '+e.message,true); }
+}
+
+function openBorrowPreviewMo(items){
+  const today = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'});
+  document.getElementById('moTitle').textContent = '📋 ตรวจสอบข้อมูลจากภาพ';
+  document.getElementById('moBody').innerHTML=`
+    <div style="font-size:.82rem;color:var(--muted);margin-bottom:12px">ตรวจสอบและแก้ไขข้อมูลก่อนบันทึก</div>
+    <div style="overflow:auto;max-height:400px">
+      <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+        <thead><tr style="background:var(--surface2);color:var(--muted);font-size:.72rem">
+          <th style="padding:6px 10px;text-align:left">รหัสวัสดุ</th>
+          <th style="padding:6px 10px;text-align:left">ชื่อพัสดุ (ดึงจากรหัส)</th>
+          <th style="padding:6px 10px;text-align:left">จำนวน</th>
+          <th style="padding:6px 10px;text-align:left">ผู้ยืม</th>
+          <th style="padding:6px 10px;text-align:left">รหัสพนักงาน</th>
+          <th style="padding:6px 10px;text-align:left">ผู้ควบคุมพัสดุ</th>
+        </tr></thead>
+        <tbody>${items.map((it,i)=>`<tr>
+          <td style="padding:4px 6px"><input class="mo-input" id="bpv_code_${i}" value="${it.code||''}" style="width:120px;font-size:.78rem" oninput="updateBorrowPreviewName(${i},this.value)"></td>
+          <td style="padding:4px 6px;font-size:.78rem;color:var(--muted)" id="bpv_name_${i}">${nameMap[(it.code||'').replace(/-/g,'')]||'–'}</td>
+          <td style="padding:4px 6px"><input class="mo-input" id="bpv_qty_${i}" value="${it.qty||''}" style="width:70px;font-size:.78rem"></td>
+          <td style="padding:4px 6px"><input class="mo-input" id="bpv_borrower_${i}" value="${it.borrower||''}" style="width:120px;font-size:.78rem"></td>
+          <td style="padding:4px 6px"><input class="mo-input" id="bpv_empid_${i}" value="${it.empId||''}" style="width:80px;font-size:.78rem"></td>
+          <td style="padding:4px 6px"><input class="mo-input" id="bpv_custodian_${i}" value="${it.custodian||''}" style="width:120px;font-size:.78rem"></td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="closeMoDirect()" style="padding:8px 20px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Sarabun',sans-serif">ยกเลิก</button>
+      <button onclick="saveBorrowFromPreview(${items.length})" style="padding:8px 24px;border-radius:8px;border:none;background:var(--accent);color:#000;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">💾 บันทึกลง Sheets</button>
+    </div>`;
+  ensureInputStyle();
+  document.getElementById('mo').classList.add('open');
+}
+
+function updateBorrowPreviewName(i, val){
+  const clean = val.replace(/-/g,'').trim();
+  const el = document.getElementById('bpv_name_'+i);
+  if(el) el.textContent = nameMap[clean]||'–';
+}
+
+async function saveBorrowFromPreview(count){
+  const today = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'2-digit',day:'2-digit'});
+  const rows = [];
+  for(let i=0;i<count;i++){
+    const code     = (document.getElementById('bpv_code_'+i)?.value||'').replace(/-/g,'').trim();
+    const qty      = document.getElementById('bpv_qty_'+i)?.value||'';
+    const borrower = document.getElementById('bpv_borrower_'+i)?.value||'';
+    const empId    = document.getElementById('bpv_empid_'+i)?.value||'';
+    const custodian= document.getElementById('bpv_custodian_'+i)?.value||'';
+    if(!code) continue;
+    const name = nameMap[code]||'';
+    rows.push([code, name, qty, borrower, empId, custodian, today, 'ยังไม่ดำเนินการ', 'ยังไม่ดำเนินการ']);
+  }
+  if(!rows.length){ showToast('ไม่มีข้อมูลที่จะบันทึก',true); return; }
+  try{
+    const ok = await sheetsAppend(SHEET_BORROW_NAME, rows);
+    if(ok){ closeMoDirect(); showToast(`บันทึก ${rows.length} รายการสำเร็จ ✓`); fetchBorrow(); }
+  }catch(e){ showToast('บันทึกไม่สำเร็จ: '+e.message,true); }
+}
+
+function exportBorrowCSV(){
+  const h=['รหัสวัสดุ','ชื่อพัสดุ','จำนวน','ผู้ยืม','รหัสพนักงาน','ผู้ควบคุมพัสดุ','วันที่','สถานะ','ดำเนินการโดย'];
+  const rows = filteredBorrow().map(r=>[r.code,r.name||nameMap[r.code]||'',r.qty,r.borrower,r.empId,r.custodian,r.date,r.status,r.action]);
+  dlCSV([h,...rows],'borrow_data.csv');
+}
+
+// ── เรียก fetchBorrow เมื่อ switch มา tab นี้ครั้งแรก ──
+let _borrowLoaded = false;
+
+// ══ ติดตามคอนกรีต (Concrete) ══════════════════════════════════
+let concreteData = [];
+let concreteSort = {col:'code',dir:1};
+let concretePage = 1;
+const CONCRETE_PS = 20;
+// กลุ่มพัสดุที่ต้องติดตาม — เสา/คอน/คาน/สมอบกคอนกรีต
+const CONCRETE_GROUPS = new Set(['เสาคอนกรีต','คอนกรีต','คาน','สมอบกคอนกรีต','เสา','เสาไฟ','เสาไม้']);
+
+function buildConcreteData(){
+  if(!zmbResult.length) return;
+  // หาว่ากลุ่มไหนเป็น concrete group จาก groupMap
+  const concreteGroupNames = new Set(
+    [...new Set(Object.values(groupMap))].filter(g=>
+      g&&(g.includes('เสา')||g.includes('คอนกรีต')||g.includes('คาน')||g.includes('สมอบก'))
+    )
+  );
+
+  // populate dropdown
+  const gf = document.getElementById('concreteGroupFilter');
+  if(gf){
+    const cur = gf.value;
+    gf.innerHTML = '<option value="">ทุกกลุ่ม</option>';
+    [...concreteGroupNames].sort().forEach(g=>{
+      const o=document.createElement('option'); o.value=g; o.textContent=g; gf.appendChild(o);
+    });
+    gf.value = cur;
+  }
+
+  // หารหัสวัสดุที่อยู่ในกลุ่ม concrete
+  const concreteCodes = new Set(
+    Object.entries(groupMap)
+      .filter(([code,grp])=>concreteGroupNames.has(grp))
+      .map(([code])=>code)
+  );
+
+  // กรอง WBS จาก zmbResult ที่มีเฉพาะพัสดุกลุ่ม concrete
+  concreteData = [];
+  zmbResult.forEach(z=>{
+    if(!concreteCodes.has(z.code)) return;
+    z.wbsList.forEach(w=>{
+      concreteData.push({
+        code: z.code,
+        name: z.name||nameMap[z.code]||'',
+        wbs:  w.wbs,
+        wbsName: cn43nNameMap[w.wbs]||'',
+        network: w.network||'',
+        supervisor: cn43nSuperMap[w.wbs]||'',
+        demand: w.demand,
+        status: w.status,
+        reqDate: excelDateToStr(w.reqDate),
+        group: groupMap[z.code]||'',
+      });
+    });
+  });
+
+  // Stats
+  const total = new Set(concreteData.map(r=>r.wbs)).size;
+  const urgentC3 = concreteData.filter(r=>r.status==='C3').length;
+  document.getElementById('concreteStatsRow').innerHTML=`
+    <div class="sc b"><div class="sc-label">WBS ที่มีความต้องการ</div><div class="sc-val">${total}</div><div class="sc-sub">unique WBS</div></div>
+    <div class="sc r"><div class="sc-label">สถานะ C3 (เร่งด่วน)</div><div class="sc-val">${urgentC3}</div><div class="sc-sub">รายการ</div></div>
+    <div class="sc y"><div class="sc-label">รหัสพัสดุ</div><div class="sc-val">${new Set(concreteData.map(r=>r.code)).size}</div><div class="sc-sub">รหัส</div></div>`;
+}
+
+function renderConcrete(){
+  if(!concreteData.length){ buildConcreteData(); }
+  const q = (document.getElementById('concreteSearch')?.value||'').toLowerCase();
+  const grp = document.getElementById('concreteGroupFilter')?.value||'';
+  let rows = concreteData.filter(r=>{
+    const tm = !q||r.code.includes(q)||r.name.toLowerCase().includes(q)||r.wbs.toLowerCase().includes(q)||r.wbsName.toLowerCase().includes(q);
+    const gm = !grp||r.group===grp;
+    return tm&&gm;
+  }).sort((a,b)=>{
+    let va=a[concreteSort.col]??'', vb=b[concreteSort.col]??'';
+    if(typeof va==='string'){va=va.toLowerCase();vb=vb.toLowerCase();}
+    return va<vb?-concreteSort.dir:va>vb?concreteSort.dir:0;
+  });
+
+  const pages = Math.max(1,Math.ceil(rows.length/CONCRETE_PS));
+  if(concretePage>pages) concretePage=pages;
+  const sl = rows.slice((concretePage-1)*CONCRETE_PS, concretePage*CONCRETE_PS);
+  document.getElementById('concreteCount').textContent=`${rows.length} รายการ`;
+  document.getElementById('concreteBody').innerHTML = sl.map((r,i)=>`
+    <tr style="animation-delay:${i*10}ms">
+      <td class="mono" style="font-weight:600;color:var(--text)">${r.code}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-weight:500">${r.name}</td>
+      <td class="mono" style="color:var(--blue);font-size:.76rem">${r.wbs}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;font-size:.78rem">${r.wbsName||'–'}</td>
+      <td class="mono" style="font-size:.76rem">${r.network||'–'}</td>
+      <td style="font-size:.78rem;color:var(--muted)">${r.supervisor||'–'}</td>
+      <td class="mono" style="color:var(--accent3);font-weight:600;text-align:right">${r.demand.toLocaleString()}</td>
+      <td><span class="badge ${r.status==='C3'?'cancel':r.status==='C2'?'pending':'done'}" style="${r.status==='C3'?'background:rgba(255,107,107,.15);color:var(--accent2);border-color:rgba(255,107,107,.3)':''}">${r.status}</span></td>
+      <td class="mono" style="font-size:.76rem">${r.reqDate||'–'}</td>
+    </tr>`).join('') || '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--muted)">ไม่พบข้อมูล — กรุณาอัปโหลด ZMB25 และ CN43N ก่อน</td></tr>';
+
+  renderPag('concretePi','concretePbtns',concretePage,pages,rows.length,p=>{concretePage=p;renderConcrete();});
+  document.querySelectorAll('th[data-tbl="concrete"]').forEach(th=>{
+    th.classList.toggle('sorted',th.dataset.col===concreteSort.col);
+    const ic=th.querySelector('.si');
+    if(ic) ic.textContent=th.dataset.col===concreteSort.col?(concreteSort.dir===1?'↑':'↓'):'↕';
+  });
+}
+
+document.querySelectorAll('th[data-tbl="concrete"]').forEach(th=>{th.addEventListener('click',()=>{
+  if(concreteSort.col===th.dataset.col) concreteSort.dir*=-1; else{concreteSort.col=th.dataset.col;concreteSort.dir=1;}
+  concretePage=1; renderConcrete();
+});});
+
+function exportConcreteCSV(){
+  const q=(document.getElementById('concreteSearch')?.value||'').toLowerCase();
+  const grp=document.getElementById('concreteGroupFilter')?.value||'';
+  const rows=concreteData.filter(r=>{
+    const tm=!q||r.code.includes(q)||r.name.toLowerCase().includes(q)||r.wbs.toLowerCase().includes(q);
+    return tm&&(!grp||r.group===grp);
+  });
+  dlCSV([
+    ['รหัสวัสดุ','ชื่อวัสดุ','องค์ประกอบ WBS','ชื่องาน','โครงข่าย','ชื่อช่างควบคุมงาน','ความต้องการ','สถานะ','วันที่ความต้องการ'],
+    ...rows.map(r=>[r.code,r.name,r.wbs,r.wbsName,r.network,r.supervisor,r.demand,r.status,r.reqDate])
+  ],'concrete_tracking.csv');
+}
+
+// ── Load borrow เมื่อ tab ถูกเปิด ──
+const _origSwitchTab = window.switchTab;
+
+// ══ Theme Toggle ══════════════════════════════════════════════════
 function toggleTheme(){
   const html=document.documentElement;
   const isLight=html.getAttribute('data-theme')==='light';
