@@ -117,7 +117,7 @@ onAuthStateChanged(auth, async (fbUser) => {
       hideAuthScreen();
       if(window.applyPerms) window.applyPerms();
       window.showToast&&window.showToast('ยินดีต้อนรับ ' + window.userPerms.name);
-      // โหลดข้อมูลจาก cloud + sync PR/PO อัตโนมัติ
+      // โหลดข้อมูลจาก cloud + sync อัตโนมัติ
       if(window.loadCloudData) window.loadCloudData();
     } else {
       // doc ไม่มี — อาจเกิดจาก Firestore rules หรือ user ถูกลบ
@@ -280,10 +280,8 @@ window.loadCloudData = async function(){
     if(mb52Raw||cn43nRaw||zmbRaw) window.showToast&&window.showToast('โหลดข้อมูล cloud สำเร็จ ✓');
     else window.showToast&&window.showToast('ยังไม่มีข้อมูลใน cloud — กรุณาอัปโหลดไฟล์');
     fetchBorrow();
-    // sync PR/PO และชื่อพัสดุจาก Google Sheets อัตโนมัติหลังโหลด cloud เสร็จ
-    if(typeof syncAll === 'function'){
-      setTimeout(()=>syncAll(), 400);
-    }
+    if(typeof syncAll==='function') setTimeout(()=>syncAll(), 400);
+    if(window.loadMb51Cloud) window.loadMb51Cloud();
   }catch(e){
     window.showToast&&window.showToast('โหลด cloud ไม่สำเร็จ: '+e.message, true);
   }
@@ -676,9 +674,14 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--muted
       <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       <span id="zmb25Label">อัปโหลด ZMB25</span>
     </button>
+    <button class="upload-btn edit-only" style="display:none;border-color:rgba(96,165,250,.4);background:rgba(96,165,250,.08);color:var(--blue)" onclick="if(!gAccessToken&&!(window.userPerms&&window.userPerms.canUpload)){showToast('คุณไม่มีสิทธิ์อัปโหลด',true);return;}document.getElementById('mb51Input').click()">
+      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span id="mb51Label">อัปโหลด MB51</span>
+    </button>
     <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(event)">
     <input type="file" id="cn43nInput" accept=".xlsx,.xls" onchange="handleCn43n(event)">
     <input type="file" id="zmb25Input" accept=".xlsx,.xls" onchange="handleZmb25(event)">
+    <input type="file" id="mb51Input" accept=".xlsx,.xls" onchange="handleMb51(event)">
     <span class="hsource" style="display:none" id="sapBadge">SAP MB52</span>
   </div>
 </header>
@@ -692,6 +695,7 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--muted
     <button class="tab-btn" onclick="switchTab('zmb')">📊 ความต้องการพัสดุ (ZMB25)</button>
     <button class="tab-btn" onclick="switchTab('borrow')">📤 ยืมพัสดุ</button>
     <button class="tab-btn" onclick="switchTab('concrete')">🏗 ติดตามคอนกรีต</button>
+    <button class="tab-btn" onclick="switchTab('mb51')">📈 เคลื่อนไหวพัสดุ (MB51)</button>
   </div>
 
   <!-- ══ TAB 1: Inventory ══ -->
@@ -729,6 +733,13 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--muted
         <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         ส่งออก CSV
       </button>
+      <select id="monthsLeftFilter" onchange="invFilter.monthsLeft=this.value;invPage=1;renderInv()" style="font-size:.83rem">
+        <option value="">ทุกระยะเวลา</option>
+        <option value="3">เหลือน้อยกว่า 3 เดือน</option>
+        <option value="6">เหลือน้อยกว่า 6 เดือน</option>
+        <option value="12">เหลือน้อยกว่า 12 เดือน</option>
+        <option value="0">ไม่มีการใช้งาน (0)</option>
+      </select>
       <span class="cnt" id="invCount"></span>
     </div>
     <div class="tw">
@@ -744,6 +755,7 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--muted
             <th data-tbl="inv" data-col="value">มูลค่า (THB) <span class="si">↕</span></th>
             <th data-tbl="inv" data-col="demand">ความต้องการ <span class="si">↕</span></th>
             <th data-tbl="inv" data-col="surplus">เพียงพอ/ขาดแคลน <span class="si">↕</span></th>
+            <th data-tbl="inv" data-col="monthsLeft" style="color:var(--blue)">ใช้ได้ (เดือน) <span class="si">↕</span></th>
             <th data-tbl="inv" data-col="pendingNoPO" style="color:var(--accent2)">รอขึ้น PO <span class="si">↕</span></th>
             <th data-tbl="inv" data-col="pending103">รอรับ 103 <span class="si">↕</span></th>
             <th data-tbl="inv" data-col="pending105">รอรับ 105 <span class="si">↕</span></th>
@@ -1014,9 +1026,7 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--muted
         <tbody id="concreteSummaryBody"></tbody>
       </table></div>
     </div>
-    <!-- overlay สีดำ -->
     <div id="concreteChartOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);z-index:9998" onclick="closeConcreteChart()"></div>
-    <!-- กล่องกราฟ transform center -->
     <div id="concreteChartBox" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(96vw,1100px);max-height:82vh;background:var(--surface);border:1px solid var(--border);border-radius:14px;z-index:9999;flex-direction:column;animation:moin .18s ease;overflow:hidden">
       <div style="padding:18px 22px 0;flex-shrink:0">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;gap:12px">
@@ -1049,6 +1059,50 @@ td.mono{font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--muted
       <th data-tbl="concrete" data-col="reqDate">วันที่ความต้องการ <span class="si">↕</span></th>
     </tr></thead><tbody id="concreteBody"></tbody></table></div>
     <div class="pag"><span id="concretePi"></span><div class="pbtns" id="concretePbtns"></div></div></div>
+  </div>
+
+  <!-- ══ TAB 7: MB51 เคลื่อนไหวพัสดุ ══ -->
+  <div class="tab-panel" id="tab-mb51">
+    <div class="stats" id="mb51StatsRow" style="margin-bottom:20px"></div>
+    <div class="toolbar" style="margin-bottom:14px;flex-wrap:wrap">
+      <div class="sw">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="mb51Search" placeholder="ค้นหารหัส / ชื่อพัสดุ…" oninput="renderMb51()">
+      </div>
+      <select id="mb51AlertFilter" onchange="renderMb51()" style="font-size:.83rem">
+        <option value="">ทุกสถานะ</option>
+        <option value="dead">🔴 Dead Stock (ไม่เคลื่อนไหว &gt; 6 เดือน)</option>
+        <option value="slow">🟡 Slow Moving (เคลื่อนไหวช้า)</option>
+        <option value="normal">🟢 ปกติ</option>
+      </select>
+      <select id="mb51MonthsFilter" onchange="renderMb51()" style="font-size:.83rem">
+        <option value="">ทุกระยะ</option>
+        <option value="3">ใช้ได้ &lt; 3 เดือน</option>
+        <option value="6">ใช้ได้ &lt; 6 เดือน</option>
+        <option value="12">ใช้ได้ &lt; 12 เดือน</option>
+      </select>
+      <button class="btn btn-ghost" onclick="exportMb51CSV()">⬇ ส่งออก CSV</button>
+      <span class="cnt" id="mb51Count"></span>
+    </div>
+    <div class="tw">
+      <div class="ts">
+        <table>
+          <thead><tr>
+            <th data-tbl="mb51" data-col="code">รหัสวัสดุ <span class="si">↕</span></th>
+            <th data-tbl="mb51" data-col="name">ชื่อวัสดุ <span class="si">↕</span></th>
+            <th data-tbl="mb51" data-col="stock">คงคลัง <span class="si">↕</span></th>
+            <th data-tbl="mb51" data-col="avgMonthlyUsage" style="color:var(--accent3)">ค่าเฉลี่ยใช้/เดือน <span class="si">↕</span></th>
+            <th data-tbl="mb51" data-col="monthsLeft" style="color:var(--blue)">ใช้ได้ (เดือน) <span class="si">↕</span></th>
+            <th data-tbl="mb51" data-col="turnoverRatio" style="color:var(--purple)">Turnover (รอบ/ปี) <span class="si">↕</span></th>
+            <th data-tbl="mb51" data-col="daysSinceLastIssue" style="color:var(--muted)">วันที่ไม่เคลื่อนไหว <span class="si">↕</span></th>
+            <th data-tbl="mb51" data-col="lastIssueDate">เบิกล่าสุด <span class="si">↕</span></th>
+            <th data-tbl="mb51" data-col="alert">สถานะ <span class="si">↕</span></th>
+          </tr></thead>
+          <tbody id="mb51Body"></tbody>
+        </table>
+      </div>
+      <div class="pag"><span id="mb51Pi"></span><div class="pbtns" id="mb51Pbtns"></div></div>
+    </div>
   </div>
 
 </main>
@@ -1084,7 +1138,7 @@ let prData  = [];
 let nameMap = {}, imgUrlMap = {}, packagingMap = {}, groupMap = {};
 let gAccessToken = null, gUser = null;
 let invSort={col:'code',dir:1}, prSort={col:'trackNo',dir:1};
-let invFilter={text:'',whs:new Set([...DEFAULT_WH]),unit:'',batch:new Set(['N','']),group:''}, prFilter={text:'',prNo:'',poNo:'',s103arr:new Set(),s105arr:new Set(['รอรับ']),group:''};
+let invFilter={text:'',whs:new Set([...DEFAULT_WH]),unit:'',batch:new Set(['N','']),group:'',monthsLeft:''}, prFilter={text:'',prNo:'',poNo:'',s103arr:new Set(),s105arr:new Set(['รอรับ']),group:''};
 let invPage=1, prPage=1;
 const PS=15;
 
@@ -1094,7 +1148,7 @@ let msState = { wh: new Set([...DEFAULT_WH]), batch: new Set(['N','']), s103: ne
 
 // ══ Tab switching ═════════════════════════════════════════════
 function switchTab(id){
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['inv','pr','lt','zmb','borrow','concrete'][i]===id));
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['inv','pr','lt','zmb','borrow','concrete','mb51'][i]===id));
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+id));
   if(id==='lt') renderLt();
   if(id==='zmb') renderZmb();
@@ -1103,6 +1157,7 @@ function switchTab(id){
     else renderBorrow();
   }
   if(id==='concrete'){ buildConcreteData(); renderConcrete(); }
+  if(id==='mb51'){ renderMb51(); }
 }
 
 // ══ Auth UI Functions ═════════════════════════════════════════
@@ -1821,8 +1876,10 @@ function filteredInv(){
     const textOk=!q||r.code.toLowerCase().includes(q)||(r.name&&r.name.toLowerCase().includes(q));
     const unitOk=!invFilter.unit||r.unit===invFilter.unit;
     const groupOk=!invFilter.group||(groupMap[r.code]||'')=== invFilter.group;
+    const mlF=invFilter.monthsLeft;
+    const mlOk=!mlF||(mlF==='0'?(r.monthsLeft===0):(r.monthsLeft!=null&&r.monthsLeft<parseFloat(mlF)));
     const batchOk=invFilter.batch.size===0||invFilter.batch.has(r.batch);
-    if(!textOk||!unitOk||!batchOk||!groupOk) return false;
+    if(!textOk||!unitOk||!batchOk||!groupOk||!mlOk) return false;
     // filter ที่เก็บสินค้า: ถ้าไม่มีข้อมูลคลัง (stock=0 จาก Reorder point) ผ่านเสมอ
     // ถ้ามีข้อมูลคลัง ต้องมีคลังที่ตรงกับ filter อย่างน้อย 1 คลัง
     if(invFilter.whs.size>0 && r.warehouses){
@@ -1867,6 +1924,7 @@ function renderInv(){
       <td class="mono" style="color:var(--text)">${r.value.toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
       <td class="mono" style="color:${r.demand>0?'var(--accent3)':'var(--muted)'};font-weight:${r.demand>0?'600':'400'}">${r.demand>0?r.demand.toLocaleString():'–'}</td>
       <td class="mono" style="${r.demand>0?(r.surplus>=0?'color:var(--accent);font-weight:600':'color:var(--accent2);font-weight:600'):'color:var(--muted)'}">${r.demand>0?(r.surplus>=0?'+'+r.surplus.toLocaleString():r.surplus.toLocaleString()):'–'}</td>
+      <td class="mono" style="color:${r.monthsLeft!=null?(r.monthsLeft<3?'var(--accent2)':r.monthsLeft<6?'var(--accent3)':'var(--blue)'):'var(--muted)'};font-weight:${r.monthsLeft!=null&&r.monthsLeft<6?'700':'400'}">${r.monthsLeft!=null?r.monthsLeft.toLocaleString(undefined,{maximumFractionDigits:1}):'–'}</td>
       <td class="mono" style="color:${r.pendingNoPO>0?'var(--accent2)':'var(--muted)'};font-weight:${r.pendingNoPO>0?'600':'400'}">${r.pendingNoPO>0?r.pendingNoPO.toLocaleString():'–'}</td>
       <td class="mono" style="color:${r.pending103>0?'var(--accent3)':'var(--muted)'};font-weight:${r.pending103>0?'600':'400'}">${r.pending103>0?r.pending103.toLocaleString():'–'}</td>
       <td class="mono" style="color:${r.pending105>0?'var(--blue)':'var(--muted)'};font-weight:${r.pending105>0?'600':'400'}">${r.pending105>0?r.pending105.toLocaleString():'–'}</td>
@@ -3564,7 +3622,7 @@ function openBorrowDetailMo(id){
 function printBorrowDetailPDF(docNo){
   var a=borrowData.filter(function(d){return d.docNo===docNo;});if(!a.length){showToast('ไม่พบข้อมูลใบยืม',true);return;}var r=a[0];
   var rows20=Array.from({length:20},function(_,i){var it=a[i];if(it){var u=(mb52StockMap[it.code]&&mb52StockMap[it.code][0])?mb52StockMap[it.code][0].unit:'';return '<tr><td style="border:1px solid #000;padding:3px 6px;font-size:12px">'+(it.code||'')+'</td><td style="border:1px solid #000;padding:3px 6px;font-size:12px;text-align:center">'+(it.qty||'')+'</td><td style="border:1px solid #000;padding:3px 6px;font-size:12px;text-align:center">'+u+'</td><td style="border:1px solid #000;padding:3px 6px;font-size:12px">'+(it.name||nameMap[it.code]||'')+'</td><td style="border:1px solid #000;padding:3px 6px"></td></tr>';}return '<tr><td style="border:1px solid #000;padding:3px 6px;height:22px"></td><td style="border:1px solid #000;padding:3px 6px"></td><td style="border:1px solid #000;padding:3px 6px"></td><td style="border:1px solid #000;padding:3px 6px"></td><td style="border:1px solid #000;padding:3px 6px"></td></tr>';}).join('');
-  var html='<!DOCTYPE html><html><head><meta charset="utf-8"><style>@page{size:A4;margin:15mm}body{font-family:Sarabun,Tahoma,sans-serif;color:#000;font-size:13px;margin:0}table{border-collapse:collapse;width:100%}.nb td{border:none;padding:1px 4px}@media print{.noprint{display:none}}</style></head><body><div class="noprint" style="text-align:right;margin-bottom:4px"><button onclick="window.print()" style="padding:6px 16px;background:#000;color:#fff;border:none;border-radius:4px;cursor:pointer">🖨 พิมพ์</button></div><table class="nb" style="margin-bottom:6px"><tr><td style="width:180px;vertical-align:top;font-size:12px;padding:2px 8px"><b>ใบเบิกของ</b></td><td style="font-size:12px;padding:2px 4px">ฉบับที่ 1 ส่งให้คลังพัสดุผู้จ่าย</td></tr><tr><td></td><td style="font-size:12px;padding:2px 4px">กอง/เขต...... <u>............</u></td></tr><tr><td></td><td style="font-size:12px;padding:2px 4px">แผนก...... <u>............</u></td></tr><tr><td></td><td style="font-size:12px;padding:2px 4px">การไฟฟ้า...... <u>............</u></td></tr></table><table class="nb" style="margin-bottom:4px"><tr><td style="font-size:12px">เลขที่ <u>'+docNo+'</u></td><td style="font-size:12px;text-align:right">ลงวันที่ <u>'+(r.date||'............')+'</u></td></tr></table><table class="nb" style="margin-bottom:4px"><tr><td style="font-size:12px;width:50%">โดยให้ส่งไปที่กองพัสดุ</td><td style="font-size:12px">สำหรับใช้งาน</td></tr><tr><td style="font-size:12px">.................................................................</td><td style="font-size:12px"><u>...........................................................</u></td></tr></table><table style="margin-bottom:8px"><thead><tr style="background:#f0f0f0"><th style="border:1px solid #000;padding:4px 8px;font-size:12px;width:120px">รหัสพัสดุ</th><th style="border:1px solid #000;padding:4px 8px;font-size:12px;width:70px">จำนวน</th><th style="border:1px solid #000;padding:4px 8px;font-size:12px;width:70px">หน่วยนับ</th><th style="border:1px solid #000;padding:4px 8px;font-size:12px">รายการ</th><th style="border:1px solid #000;padding:4px 8px;font-size:12px;width:70px">หมายเหตุ</th></tr></thead><tbody>'+rows20+'</tbody></table><table class="nb" style="margin-top:16px"><tr><td style="width:50%;text-align:center;font-size:12px;padding-top:8px">.......................................<br>('+(r.borrower||'......................................')+')<br><span style="font-size:11px">ผู้ยืม'+(r.empId?' รหัส '+r.empId:'')+'</span><br>........../........../.........</td><td style="width:50%;text-align:center;font-size:12px;padding-top:8px">.......................................<br>('+(r.custodian||'......................................')+')<br><span style="font-size:11px">ผู้ควบคุมพัสดุ</span><br>........../........../.........</td></tr></table><table class="nb" style="margin-top:20px;border-top:1px solid #000;padding-top:6px"><tr><td style="font-size:12px;width:33%;text-align:center">ผู้ตรวจ<br><br>.......................................<br>........../........../.........</td><td style="font-size:12px;width:33%;text-align:center">หัวหน้าแผนก<br><br>.......................................<br>........../........../.........</td><td style="font-size:12px;width:33%;text-align:center">อนุมัติ<br><br>.......................................<br>........../........../.........</td></tr></table></body></html>';
+  var html='<!DOCTYPE html><html><head><meta charset="utf-8"><style>@page{size:A4;margin:15mm}body{font-family:Sarabun,Tahoma,sans-serif;color:#000;font-size:13px;margin:0}table{border-collapse:collapse;width:100%}.nb td{border:none;padding:1px 4px}@media print{.noprint{display:none}}</style></head><body><div class="noprint" style="text-align:right;margin-bottom:4px"><button onclick="window.print()" style="padding:6px 16px;background:#000;color:#fff;border:none;border-radius:4px;cursor:pointer">🖨 พิมพ์</button></div><table class="nb" style="margin-bottom:6px"><tr><td style="width:180px;vertical-align:top;font-size:12px;padding:2px 8px"><b>ใบเบิกของ</b></td><td style="font-size:12px;padding:2px 4px">ฉบับที่ 1</td></tr></table><table class="nb" style="margin-bottom:4px"><tr><td style="font-size:12px">เลขที่ <u>'+docNo+'</u></td><td style="font-size:12px;text-align:right">ลงวันที่ <u>'+(r.date||'............')+'</u></td></tr></table><table style="margin-bottom:8px"><thead><tr style="background:#f0f0f0"><th style="border:1px solid #000;padding:4px 8px;font-size:12px;width:120px">รหัสพัสดุ</th><th style="border:1px solid #000;padding:4px 8px;font-size:12px;width:70px">จำนวน</th><th style="border:1px solid #000;padding:4px 8px;font-size:12px;width:70px">หน่วยนับ</th><th style="border:1px solid #000;padding:4px 8px;font-size:12px">รายการ</th><th style="border:1px solid #000;padding:4px 8px;font-size:12px;width:70px">หมายเหตุ</th></tr></thead><tbody>'+rows20+'</tbody></table><table class="nb" style="margin-top:16px"><tr><td style="width:50%;text-align:center;font-size:12px;padding-top:8px">.......................................<br>('+(r.borrower||'......................................')+')<br>ผู้ยืม<br>........../........../.........</td><td style="width:50%;text-align:center;font-size:12px;padding-top:8px">.......................................<br>('+(r.custodian||'......................................')+')<br>ผู้ควบคุมพัสดุ<br>........../........../.........</td></tr></table></body></html>';
   var win=window.open('','_blank','width=800,height=900');win.document.write(html);win.document.close();
 }
 
@@ -3881,6 +3939,278 @@ function previewBorrowPDF(){
   win.document.write(html);
   win.document.close();
 }
+// ══ MB51 เคลื่อนไหวพัสดุ ══════════════════════════════════════
+let mb51Data = [];      // parsed from xlsx: [{code,date,qty,mvType,value}]
+let mb51Result = [];    // aggregated per code
+let mb51Sort = {col:'alert', dir:1};
+let mb51Page = 1;
+const MB51_PS = 30;
+
+// ── map รหัสวัสดุ → monthsLeft (ใช้จาก MB52 stock) ──
+window.mb51MonthsMap = {}; // code → monthsLeft (null = no data)
+
+function handleMb51(event){
+  var file = event.target.files[0]; if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      var hdr = rows[0].map(function(v){ return String(v).trim(); });
+
+      var colDate   = hdr.indexOf('วันที่ผ่านรายการ');
+      var colCode   = hdr.indexOf('วัสดุ');
+      var colName   = hdr.indexOf('คำอธิบายวัสดุ');
+      var colQty    = hdr.indexOf('ปริมาณ');
+      var colVal    = hdr.indexOf('จนง.ของสง.ใน ปท.');
+      var colMvType = hdr.indexOf('ประเภทการเคลื่อนย้าย');
+
+      if(colCode<0||colQty<0||colMvType<0){
+        showToast('ไม่พบคอลัมที่ต้องการใน MB51 (วัสดุ, ปริมาณ, ประเภทการเคลื่อนย้าย)',true);
+        return;
+      }
+
+      mb51Data = rows.slice(1).filter(function(r){ return r[colCode]; }).map(function(r){
+        var dateVal = r[colDate];
+        var d = null;
+        if(dateVal instanceof Date) d = dateVal;
+        else if(typeof dateVal==='string' && dateVal.trim()){
+          d = new Date(dateVal);
+          if(isNaN(d)) d = null;
+        } else if(typeof dateVal==='number' && dateVal>40000){
+          d = new Date((dateVal-25569)*86400*1000);
+        }
+        return {
+          code:    String(r[colCode]||'').replace(/-/g,'').trim(),
+          name:    String(r[colName]||'').trim(),
+          qty:     parseFloat(r[colQty])||0,
+          mvType:  parseInt(r[colMvType])||0,
+          value:   parseFloat(r[colVal])||0,
+          date:    d
+        };
+      }).filter(function(r){ return r.code && r.mvType; });
+
+      processMb51();
+      document.getElementById('mb51Label').textContent = 'MB51 ✓ (' + mb51Data.length + ')';
+      showToast('โหลด MB51 สำเร็จ ' + mb51Data.length + ' รายการ');
+      if(window.fbSave) window.fbSave('mb51', mb51Data.map(function(r){
+        return {code:r.code,name:r.name,qty:r.qty,mvType:r.mvType,value:r.value,
+                date:r.date?r.date.toISOString():null};
+      }));
+    }catch(err){ showToast('อ่าน MB51 ไม่สำเร็จ: '+err.message, true); }
+    event.target.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function processMb51(){
+  // Issue types: 281, 261, 351 → qty เป็นลบ → ใช้ abs
+  var ISSUE_TYPES = new Set([281, 261, 351]);
+  var today = new Date();
+
+  // หาช่วงวันที่ของข้อมูล (เพื่อคำนวณจำนวนเดือน)
+  var dates = mb51Data.map(function(r){ return r.date; }).filter(Boolean);
+  var minDate = dates.length ? new Date(Math.min.apply(null,dates)) : new Date();
+  var maxDate = dates.length ? new Date(Math.max.apply(null,dates)) : new Date();
+  var spanMonths = Math.max(1, (maxDate - minDate) / (1000*60*60*24*30.44));
+
+  // aggregate per code
+  var codeMap = {};
+  mb51Data.forEach(function(r){
+    if(!codeMap[r.code]) codeMap[r.code] = {
+      code:r.code, name:r.name,
+      totalIssueQty:0, totalIssueVal:0,
+      lastIssueDate:null, issueCount:0
+    };
+    var c = codeMap[r.code];
+    if(!c.name && r.name) c.name = r.name;
+
+    if(ISSUE_TYPES.has(r.mvType)){
+      var qty = Math.abs(r.qty);
+      var val = Math.abs(r.value);
+      c.totalIssueQty += qty;
+      c.totalIssueVal += val;
+      c.issueCount++;
+      if(r.date && (!c.lastIssueDate || r.date > c.lastIssueDate)){
+        c.lastIssueDate = r.date;
+      }
+    }
+  });
+
+  mb51Result = Object.values(codeMap).map(function(c){
+    // ค่าเฉลี่ยต่อเดือน
+    var avgMonthlyUsage = Math.round((c.totalIssueQty / spanMonths) * 100) / 100;
+
+    // stock จาก invData (MB52)
+    var stock = 0, mb52Value = 0;
+    if(mb52StockMap[c.code] && mb52StockMap[c.code][0]){
+      mb52StockMap[c.code].forEach(function(b){ stock += b.stock||0; mb52Value += b.value||0; });
+    }
+
+    // ยังคงใช้งานได้ (เดือน)
+    var monthsLeft = (avgMonthlyUsage > 0 && stock > 0)
+      ? Math.round((stock / avgMonthlyUsage) * 10) / 10
+      : (stock <= 0 ? 0 : null);
+
+    // Turnover Ratio = มูลค่าที่ใช้ไปต่อปี / มูลค่าคงเหลือเฉลี่ย
+    var annualIssueVal = c.totalIssueVal / spanMonths * 12;
+    var turnoverRatio = (mb52Value > 0 && annualIssueVal > 0)
+      ? Math.round((annualIssueVal / mb52Value) * 100) / 100
+      : null;
+
+    // Days since last issue
+    var daysSinceLastIssue = c.lastIssueDate
+      ? Math.floor((today - c.lastIssueDate) / (1000*60*60*24))
+      : null;
+
+    // Alert classification
+    var alert = 'normal';
+    if(!c.lastIssueDate || daysSinceLastIssue > 180){
+      alert = 'dead'; // ไม่เคลื่อนไหว > 6 เดือน
+    } else if(daysSinceLastIssue > 90 || (turnoverRatio !== null && turnoverRatio < 1)){
+      alert = 'slow'; // เคลื่อนไหวช้า
+    }
+
+    return {
+      code: c.code,
+      name: c.name || nameMap[c.code] || '',
+      stock: stock,
+      mb52Value: mb52Value,
+      avgMonthlyUsage: avgMonthlyUsage,
+      monthsLeft: monthsLeft,
+      turnoverRatio: turnoverRatio,
+      lastIssueDate: c.lastIssueDate,
+      daysSinceLastIssue: daysSinceLastIssue,
+      totalIssueQty: Math.round(c.totalIssueQty),
+      alert: alert
+    };
+  });
+
+  // อัปเดต monthsLeft ใน invData เพื่อแสดงในหน้า inventory
+  window.mb51MonthsMap = {};
+  mb51Result.forEach(function(r){
+    window.mb51MonthsMap[r.code] = r.monthsLeft;
+  });
+  invData = invData.map(function(d){
+    var ml = window.mb51MonthsMap.hasOwnProperty(d.code) ? window.mb51MonthsMap[d.code] : null;
+    return Object.assign({}, d, {monthsLeft: ml});
+  });
+  buildInvFilters(); renderInv();
+  renderMb51();
+}
+
+function filteredMb51(){
+  var q = (document.getElementById('mb51Search')&&document.getElementById('mb51Search').value||'').toLowerCase();
+  var alertF = document.getElementById('mb51AlertFilter')&&document.getElementById('mb51AlertFilter').value||'';
+  var monthsF = document.getElementById('mb51MonthsFilter')&&document.getElementById('mb51MonthsFilter').value||'';
+  return mb51Result.filter(function(r){
+    var tm = !q || r.code.includes(q) || r.name.toLowerCase().includes(q);
+    var am = !alertF || r.alert === alertF;
+    var mm = !monthsF || (r.monthsLeft !== null && r.monthsLeft < parseFloat(monthsF));
+    return tm && am && mm;
+  }).sort(function(a,b){
+    var va = a[mb51Sort.col], vb = b[mb51Sort.col];
+    if(va === null || va === undefined) va = mb51Sort.dir > 0 ? Infinity : -Infinity;
+    if(vb === null || vb === undefined) vb = mb51Sort.dir > 0 ? Infinity : -Infinity;
+    if(typeof va === 'string'){ va = va.toLowerCase(); vb = vb.toLowerCase(); }
+    return va < vb ? -mb51Sort.dir : va > vb ? mb51Sort.dir : 0;
+  });
+}
+
+function renderMb51(){
+  var rows = filteredMb51();
+  var total = rows.length;
+  var pages = Math.max(1, Math.ceil(total / MB51_PS));
+  if(mb51Page > pages) mb51Page = pages;
+  var sl = rows.slice((mb51Page-1)*MB51_PS, mb51Page*MB51_PS);
+
+  // Stats
+  var deadCount = mb51Result.filter(function(r){ return r.alert==='dead'; }).length;
+  var slowCount = mb51Result.filter(function(r){ return r.alert==='slow'; }).length;
+  var low3 = mb51Result.filter(function(r){ return r.monthsLeft !== null && r.monthsLeft < 3; }).length;
+  document.getElementById('mb51StatsRow').innerHTML =
+    '<div class="sc r"><div class="sc-label">Dead Stock</div><div class="sc-val">'+deadCount.toLocaleString()+'</div><div class="sc-sub">ไม่เคลื่อนไหว &gt; 6 เดือน</div></div>'
+   +'<div class="sc y"><div class="sc-label">Slow Moving</div><div class="sc-val">'+slowCount.toLocaleString()+'</div><div class="sc-sub">เคลื่อนไหวช้า</div></div>'
+   +'<div class="sc b"><div class="sc-label">ใช้ได้ &lt; 3 เดือน</div><div class="sc-val">'+low3.toLocaleString()+'</div><div class="sc-sub">คลังเหลือน้อย</div></div>'
+   +'<div class="sc g"><div class="sc-label">รายการทั้งหมด</div><div class="sc-val">'+mb51Result.length.toLocaleString()+'</div><div class="sc-sub">รหัสวัสดุ unique</div></div>';
+
+  document.getElementById('mb51Count').textContent = total.toLocaleString() + ' รายการ';
+
+  document.getElementById('mb51Body').innerHTML = sl.map(function(r,i){
+    var alertBadge = r.alert==='dead'
+      ? '<span class="badge" style="background:rgba(255,107,107,.15);color:var(--accent2);border:1px solid rgba(255,107,107,.3)">🔴 Dead Stock</span>'
+      : r.alert==='slow'
+      ? '<span class="badge" style="background:rgba(255,201,60,.12);color:var(--accent3);border:1px solid rgba(255,201,60,.3)">🟡 Slow Moving</span>'
+      : '<span class="badge ok">🟢 ปกติ</span>';
+
+    var mlColor = r.monthsLeft === null ? 'var(--muted)'
+      : r.monthsLeft < 3 ? 'var(--accent2)'
+      : r.monthsLeft < 6 ? 'var(--accent3)'
+      : 'var(--blue)';
+    var mlText = r.monthsLeft === null ? '–'
+      : r.monthsLeft === 0 ? '0'
+      : r.monthsLeft.toLocaleString(undefined,{maximumFractionDigits:1});
+
+    var trColor = r.alert==='dead' ? 'background:rgba(255,107,107,.04)'
+      : r.alert==='slow' ? 'background:rgba(255,201,60,.04)' : '';
+
+    var lastDate = r.lastIssueDate
+      ? (r.lastIssueDate.getDate().toString().padStart(2,'0')+'/'+(r.lastIssueDate.getMonth()+1).toString().padStart(2,'0')+'/'+r.lastIssueDate.getFullYear())
+      : '–';
+    var daysSince = r.daysSinceLastIssue !== null
+      ? (r.daysSinceLastIssue + ' วัน')
+      : 'ไม่มีข้อมูล';
+
+    return '<tr style="animation-delay:'+(i*8)+'ms;'+trColor+'">'
+      +'<td class="mono" style="font-weight:700;color:var(--text)">'+r.code+'</td>'
+      +'<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:.8rem">'+r.name+'</td>'
+      +'<td class="mono" style="text-align:right">'+r.stock.toLocaleString()+'</td>'
+      +'<td class="mono" style="text-align:right;color:var(--accent3)">'+r.avgMonthlyUsage.toLocaleString(undefined,{maximumFractionDigits:1})+'</td>'
+      +'<td class="mono" style="text-align:right;color:'+mlColor+';font-weight:700">'+mlText+'</td>'
+      +'<td class="mono" style="text-align:right;color:'+(r.turnoverRatio!==null?(r.turnoverRatio<1?'var(--accent2)':r.turnoverRatio<2?'var(--accent3)':'var(--accent)'):'var(--muted)')+'">'+
+        (r.turnoverRatio!==null?r.turnoverRatio.toLocaleString(undefined,{maximumFractionDigits:2})+'x':'–')+'</td>'
+      +'<td class="mono" style="font-size:.75rem;color:'+(r.daysSinceLastIssue!==null&&r.daysSinceLastIssue>180?'var(--accent2)':r.daysSinceLastIssue!==null&&r.daysSinceLastIssue>90?'var(--accent3)':'var(--muted)')+'">'+daysSince+'</td>'
+      +'<td class="mono" style="font-size:.76rem">'+lastDate+'</td>'
+      +'<td>'+alertBadge+'</td>'
+      +'</tr>';
+  }).join('') || '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">'+(mb51Data.length?'ไม่พบข้อมูลที่ตรงกัน':'กรุณาอัปโหลดไฟล์ MB51 ก่อนครับ')+'</td></tr>';
+
+  renderPag('mb51Pi','mb51Pbtns',mb51Page,pages,total,function(p){ mb51Page=p; renderMb51(); });
+  document.querySelectorAll('th[data-tbl="mb51"]').forEach(function(th){
+    th.classList.toggle('sorted', th.dataset.col===mb51Sort.col);
+    var ic = th.querySelector('.si');
+    if(ic) ic.textContent = th.dataset.col===mb51Sort.col ? (mb51Sort.dir===1?'↑':'↓') : '↕';
+    th.onclick = function(){
+      if(mb51Sort.col===th.dataset.col) mb51Sort.dir*=-1;
+      else{ mb51Sort.col=th.dataset.col; mb51Sort.dir=1; }
+      mb51Page=1; renderMb51();
+    };
+  });
+}
+
+function exportMb51CSV(){
+  var rows = filteredMb51();
+  var hdr = ['รหัสวัสดุ','ชื่อวัสดุ','คงคลัง','ค่าเฉลี่ยใช้/เดือน','ใช้ได้ (เดือน)','Turnover (รอบ/ปี)','วันที่ไม่เคลื่อนไหว','เบิกล่าสุด','สถานะ'];
+  var data = rows.map(function(r){
+    var lastDate = r.lastIssueDate
+      ? (r.lastIssueDate.getDate().toString().padStart(2,'0')+'/'+(r.lastIssueDate.getMonth()+1).toString().padStart(2,'0')+'/'+r.lastIssueDate.getFullYear())
+      : '';
+    return [r.code,r.name,r.stock,r.avgMonthlyUsage,r.monthsLeft,r.turnoverRatio,r.daysSinceLastIssue!==null?r.daysSinceLastIssue+'':'',lastDate,r.alert];
+  });
+  dlCSV([hdr].concat(data), 'mb51_movement.csv');
+}
+
+// โหลด MB51 จาก cloud (ถ้ามี)
+window.loadMb51Cloud = async function(){
+  var raw = await window.fbLoad('mb51');
+  if(!raw || !raw.length) return;
+  mb51Data = raw.map(function(r){
+    return Object.assign({}, r, {date: r.date ? new Date(r.date) : null});
+  });
+  processMb51();
+};
+
 // ══ ติดตามคอนกรีต ════════════════════════════════════════════
 const CONCRETE_GROUP_KEYWORDS=['เสา','คอน','คาน','สมอบก'];
 function isConcreteCode(code){var grp=(groupMap[code]||'').toLowerCase();return CONCRETE_GROUP_KEYWORDS.some(function(k){return grp.includes(k.toLowerCase());});}
@@ -3902,12 +4232,7 @@ function buildConcreteData(){
   document.querySelectorAll('th[data-tbl="concrete"]').forEach(function(th){th.onclick=function(){if(concreteSort.col===th.dataset.col)concreteSort.dir*=-1;else{concreteSort.col=th.dataset.col;concreteSort.dir=1;}concretePage=1;renderConcrete();};});
   renderConcrete();
 }
-function closeConcreteChart(){
-  var ov=document.getElementById('concreteChartOverlay');
-  var bx=document.getElementById('concreteChartBox');
-  if(ov)ov.style.display='none';
-  if(bx)bx.style.display='none';
-}
+function closeConcreteChart(){var ov=document.getElementById('concreteChartOverlay');var bx=document.getElementById('concreteChartBox');if(ov)ov.style.display='none';if(bx)bx.style.display='none';}
 function showConcreteChart(code){
   var rows=concreteData.filter(function(r){return r.code===code;});if(!rows.length)return;
   var supMap={};
@@ -3922,37 +4247,22 @@ function showConcreteChart(code){
   var barsHtml=sups.map(function(s){var pE=Math.round(s.est/maxVal*chartH),pM=Math.round(s.moved/maxVal*chartH),pD=Math.round(s.demand/maxVal*chartH);var lbl=s.sup.length>14?s.sup.slice(0,14)+'…':s.sup;return '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:'+barW+'px;max-width:'+barW+'px"><div style="font-size:.65rem;color:var(--accent3);font-family:\'IBM Plex Mono\',monospace;font-weight:700;white-space:nowrap">ต้องการ: '+s.demand.toLocaleString()+'</div><div style="position:relative;width:100%;height:'+chartH+'px;display:flex;align-items:flex-end;justify-content:center;gap:3px;padding-top:20px"><div title="ประมาณการ: '+s.est+'" style="width:28%;height:'+pE+'px;background:rgba(107,114,128,.4);border-radius:3px 3px 0 0;position:relative"><span style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:.6rem;color:var(--muted);white-space:nowrap">'+s.est.toLocaleString()+'</span></div><div title="เบิกแล้ว: '+s.moved+'" style="width:28%;height:'+pM+'px;background:var(--accent);opacity:.85;border-radius:3px 3px 0 0;position:relative"><span style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:.6rem;color:var(--accent);white-space:nowrap">'+s.moved.toLocaleString()+'</span></div><div title="ความต้องการ: '+s.demand+'" style="width:28%;height:'+(pD||2)+'px;background:'+(s.demand>0?'var(--accent3)':'rgba(107,114,128,.15)')+';border-radius:3px 3px 0 0;position:relative">'+(s.demand>0?'<span style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:.6rem;color:var(--accent3);font-weight:700;white-space:nowrap">'+s.demand.toLocaleString()+'</span>':'')+'</div></div><div style="font-size:.7rem;color:var(--text);text-align:center;padding-top:6px;word-break:break-all;line-height:1.4;max-width:'+barW+'px" title="'+s.sup+'">'+lbl+'</div><div style="font-size:.63rem;color:var(--muted)">'+s.wbs.size+' WBS</div></div>';}).join('');
   document.getElementById('concreteChartInner').innerHTML='<div style="display:flex;gap:8px;padding:4px 2px;min-width:max-content">'+barsHtml+'</div>';
   var ov=document.getElementById('concreteChartOverlay');var bx=document.getElementById('concreteChartBox');
-  if(ov)ov.style.display='block';
-  if(bx)bx.style.display='flex';
+  if(ov)ov.style.display='block';if(bx)bx.style.display='flex';
 }
-function filteredConcrete(){
-  var q=(document.getElementById('concreteSearch')&&document.getElementById('concreteSearch').value||'').toLowerCase();
-  var cf=document.getElementById('concreteCodeFilter')&&document.getElementById('concreteCodeFilter').value||'';
-  var sf=document.getElementById('concreteSuperFilter')&&document.getElementById('concreteSuperFilter').value||'';
-  return concreteData.filter(function(r){var tm=!q||r.code.includes(q)||r.name.toLowerCase().includes(q)||r.wbs.toLowerCase().includes(q)||r.wbsName.toLowerCase().includes(q)||r.network.toLowerCase().includes(q);return tm&&(!cf||r.code===cf)&&(!sf||r.supervisor===sf);}).sort(function(a,b){var va=a[concreteSort.col]??'',vb=b[concreteSort.col]??'';if(typeof va==='string'){va=va.toLowerCase();vb=vb.toLowerCase();}return va<vb?-concreteSort.dir:va>vb?concreteSort.dir:0;});
-}
+function filteredConcrete(){var q=(document.getElementById('concreteSearch')&&document.getElementById('concreteSearch').value||'').toLowerCase();var cf=document.getElementById('concreteCodeFilter')&&document.getElementById('concreteCodeFilter').value||'';var sf=document.getElementById('concreteSuperFilter')&&document.getElementById('concreteSuperFilter').value||'';return concreteData.filter(function(r){var tm=!q||r.code.includes(q)||r.name.toLowerCase().includes(q)||r.wbs.toLowerCase().includes(q)||r.wbsName.toLowerCase().includes(q)||r.network.toLowerCase().includes(q);return tm&&(!cf||r.code===cf)&&(!sf||r.supervisor===sf);}).sort(function(a,b){var va=a[concreteSort.col]??'',vb=b[concreteSort.col]??'';if(typeof va==='string'){va=va.toLowerCase();vb=vb.toLowerCase();}return va<vb?-concreteSort.dir:va>vb?concreteSort.dir:0;});}
 function renderConcrete(){
   var sb=document.getElementById('concreteSummaryBody');
   if(sb){
     if(!concreteSummary.length){sb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">'+(zmb25Data.length?'ไม่พบรหัสกลุ่มคอนกรีต':'กรุณาอัปโหลด ZMB25 และ CN43N ก่อนครับ')+'</td></tr>';}
-    else{
-      var tE=0,tM=0,tD=0;concreteSummary.forEach(function(s){tE+=s.tEst;tM+=s.tMov;tD+=s.tDem;});
-      sb.innerHTML=concreteSummary.map(function(s){var pct=s.tEst>0?Math.round(s.tMov/s.tEst*100):0;return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'" onclick="showConcreteChart(\''+s.code+'\')">'+'<td style="padding:9px 13px;font-family:\'IBM Plex Mono\',monospace;font-size:.8rem;font-weight:700;color:var(--accent)">'+s.code+'</td>'+'<td style="padding:9px 13px;font-size:.83rem;font-weight:500">'+s.name+'</td>'+'<td style="padding:9px 13px;font-family:\'IBM Plex Mono\',monospace;font-size:.82rem;text-align:right;color:var(--muted)">'+s.tEst.toLocaleString()+'</td>'+'<td style="padding:9px 13px;text-align:right"><span style="font-family:\'IBM Plex Mono\',monospace;font-size:.82rem;font-weight:600;color:var(--accent)">'+s.tMov.toLocaleString()+'</span> <span style="font-size:.68rem;color:var(--muted)">('+pct+'%)</span></td>'+'<td style="padding:9px 13px;font-family:\'IBM Plex Mono\',monospace;font-size:.85rem;font-weight:700;color:var(--accent3);text-align:right">'+s.tDem.toLocaleString()+'</td>'+'<td style="padding:9px 13px;font-family:\'IBM Plex Mono\',monospace;font-size:.8rem;color:var(--muted);text-align:right">'+s.wbsCount+'</td></tr>';}).join('')+'<tr style="border-top:2px solid var(--border);background:var(--surface2)"><td colspan="2" style="padding:8px 13px;font-size:.8rem;font-weight:600;color:var(--muted)">รวมทั้งหมด</td><td style="padding:8px 13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;color:var(--muted)">'+Math.round(tE).toLocaleString()+'</td><td style="padding:8px 13px;font-family:\'IBM Plex Mono\',monospace;font-weight:700;color:var(--accent);text-align:right">'+Math.round(tM).toLocaleString()+'</td><td style="padding:8px 13px;font-family:\'IBM Plex Mono\',monospace;font-size:.88rem;font-weight:700;color:var(--accent3);text-align:right">'+Math.round(tD).toLocaleString()+'</td><td style="padding:8px 13px;font-family:\'IBM Plex Mono\',monospace;color:var(--muted);text-align:right">'+new Set(concreteData.map(function(r){return r.wbs;})).size+'</td></tr>';
-    }
+    else{var tE=0,tM=0,tD=0;concreteSummary.forEach(function(s){tE+=s.tEst;tM+=s.tMov;tD+=s.tDem;});sb.innerHTML=concreteSummary.map(function(s){var pct=s.tEst>0?Math.round(s.tMov/s.tEst*100):0;return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'" onclick="showConcreteChart(\''+s.code+'\')">'+'<td style="padding:9px 13px;font-family:\'IBM Plex Mono\',monospace;font-size:.8rem;font-weight:700;color:var(--accent)">'+s.code+'</td><td style="padding:9px 13px;font-size:.83rem;font-weight:500">'+s.name+'</td><td style="padding:9px 13px;font-family:\'IBM Plex Mono\',monospace;font-size:.82rem;text-align:right;color:var(--muted)">'+s.tEst.toLocaleString()+'</td><td style="padding:9px 13px;text-align:right"><span style="font-family:\'IBM Plex Mono\',monospace;font-size:.82rem;font-weight:600;color:var(--accent)">'+s.tMov.toLocaleString()+'</span> <span style="font-size:.68rem;color:var(--muted)">('+pct+'%)</span></td><td style="padding:9px 13px;font-family:\'IBM Plex Mono\',monospace;font-size:.85rem;font-weight:700;color:var(--accent3);text-align:right">'+s.tDem.toLocaleString()+'</td><td style="padding:9px 13px;font-family:\'IBM Plex Mono\',monospace;font-size:.8rem;color:var(--muted);text-align:right">'+s.wbsCount+'</td></tr>';}).join('')+'<tr style="border-top:2px solid var(--border);background:var(--surface2)"><td colspan="2" style="padding:8px 13px;font-size:.8rem;font-weight:600;color:var(--muted)">รวมทั้งหมด</td><td style="padding:8px 13px;font-family:\'IBM Plex Mono\',monospace;text-align:right;color:var(--muted)">'+Math.round(tE).toLocaleString()+'</td><td style="padding:8px 13px;font-family:\'IBM Plex Mono\',monospace;font-weight:700;color:var(--accent);text-align:right">'+Math.round(tM).toLocaleString()+'</td><td style="padding:8px 13px;font-family:\'IBM Plex Mono\',monospace;font-size:.88rem;font-weight:700;color:var(--accent3);text-align:right">'+Math.round(tD).toLocaleString()+'</td><td style="padding:8px 13px;font-family:\'IBM Plex Mono\',monospace;color:var(--muted);text-align:right">'+new Set(concreteData.map(function(r){return r.wbs;})).size+'</td></tr>';}
   }
-  var rows=filteredConcrete(),total=rows.length,pages=Math.max(1,Math.ceil(total/CONCRETE_PS));
-  if(concretePage>pages)concretePage=pages;
-  var sl=rows.slice((concretePage-1)*CONCRETE_PS,concretePage*CONCRETE_PS);
+  var rows=filteredConcrete(),total=rows.length,pages=Math.max(1,Math.ceil(total/CONCRETE_PS));if(concretePage>pages)concretePage=pages;var sl=rows.slice((concretePage-1)*CONCRETE_PS,concretePage*CONCRETE_PS);
   document.getElementById('concreteCount').textContent=total.toLocaleString()+' รายการ ('+new Set(rows.map(function(r){return r.wbs;})).size+' WBS)';
   document.getElementById('concreteBody').innerHTML=sl.map(function(r,i){var stCls=r.status==='C3'?'badge low':r.status==='C2'?'badge pending':r.status==='C1'?'badge ok':'badge';return '<tr style="animation-delay:'+(i*6)+'ms"><td class="mono" style="font-weight:700;color:var(--text)">'+r.code+'</td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;font-size:.8rem">'+r.name+'</td><td class="mono" style="color:var(--blue);font-size:.76rem">'+r.wbs+'</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;font-size:.78rem;color:var(--muted)" title="'+r.wbsName+'">'+r.wbsName+'</td><td class="mono" style="font-size:.75rem;color:var(--muted)">'+r.network+'</td><td style="font-size:.78rem">'+r.supervisor+'</td><td class="mono" style="text-align:right;color:var(--muted)">'+r.estimate.toLocaleString()+'</td><td class="mono" style="text-align:right;color:var(--accent);font-weight:600">'+r.moved.toLocaleString()+'</td><td class="mono" style="text-align:right;color:var(--accent3);font-weight:700">'+r.demand.toLocaleString()+'</td><td><span class="'+stCls+'">'+r.status+'</span></td><td class="mono" style="font-size:.75rem">'+excelDateToStr(r.reqDate)+'</td></tr>';}).join('')||'<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--muted)">'+(zmb25Data.length?'ไม่พบข้อมูล':'กรุณาอัปโหลด ZMB25 และ CN43N')+'</td></tr>';
   renderPag('concretePi','concretePbtns',concretePage,pages,total,function(p){concretePage=p;renderConcrete();});
   document.querySelectorAll('th[data-tbl="concrete"]').forEach(function(th){th.classList.toggle('sorted',th.dataset.col===concreteSort.col);var ic=th.querySelector('.si');if(ic)ic.textContent=th.dataset.col===concreteSort.col?(concreteSort.dir===1?'↑':'↓'):'↕';});
 }
-function exportConcreteCSV(){
-  var rows=filteredConcrete();var hdr=['รหัสวัสดุ','ชื่อวัสดุ','กลุ่ม','องค์ประกอบ WBS','ชื่องาน','โครงข่าย','ช่างควบคุมงาน','ประมาณการ','เบิกแล้ว','ความต้องการ','สถานะ','วันที่ความต้องการ'];
-  var data=rows.map(function(r){return[r.code,r.name,r.group,r.wbs,r.wbsName,r.network,r.supervisor,r.estimate,r.moved,r.demand,r.status,excelDateToStr(r.reqDate)];});
-  dlCSV([hdr].concat(data),'concrete_tracking.csv');
-}
+function exportConcreteCSV(){var rows=filteredConcrete();var hdr=['รหัสวัสดุ','ชื่อวัสดุ','กลุ่ม','องค์ประกอบ WBS','ชื่องาน','โครงข่าย','ช่างควบคุมงาน','ประมาณการ','เบิกแล้ว','ความต้องการ','สถานะ','วันที่ความต้องการ'];var data=rows.map(function(r){return[r.code,r.name,r.group,r.wbs,r.wbsName,r.network,r.supervisor,r.estimate,r.moved,r.demand,r.status,excelDateToStr(r.reqDate)];});dlCSV([hdr].concat(data),'concrete_tracking.csv');}
 
 // ══ Theme Toggle ═════════════════════════════════════════════
 function toggleTheme(){
