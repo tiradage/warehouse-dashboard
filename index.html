@@ -5058,11 +5058,16 @@ async function fetchSafetyStock(tab){
       var nameRaw=colName!==colCode?String(r[colName]||'').trim():'';
       // ดึง nameMap
       var name=nameRaw||nameMap[code]||'';
-      // ดึง stock จาก mb52StockMap เฉพาะ wh นั้น
+      // ดึง stock จาก mb52StockMap เฉพาะ warehouse นั้น
+      // mb52StockMap[code] = [{whStock:{"21":qty,"22":qty,...}, ...}]
+      // wh = "0021" -> warehouse key = "21"
+      var whKey = wh.replace(/^0+/,''); // "0021" -> "21", "0023" -> "23"
       var stock=0;
       if(mb52StockMap[code]){
         mb52StockMap[code].forEach(function(w){
-          if(String(w.wh||'').includes(wh)) stock+=(parseFloat(w.qty)||0);
+          if(w.whStock && w.whStock[whKey]){
+            stock += parseFloat(w.whStock[whKey])||0;
+          }
         });
       }
       // ดึง group จาก groupMap
