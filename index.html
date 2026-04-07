@@ -2882,6 +2882,9 @@ function handleCn43n(event){
       const wbsIdx=hdr.indexOf('องค์ประกอบ WBS');
       const stIdx=hdr.indexOf('สถานะ');
       if(wbsIdx<0||stIdx<0){showToast('ไม่พบคอลัมน์ที่ต้องการใน CN43N',true);return;}
+      // auto-detect columns
+      const nameIdx=hdr.indexOf('ชื่อ');         // col B = ชื่องาน
+      const superIdx=hdr.indexOf('ผู้สมัคร');    // col D = ผู้ควบคุมงาน
       cn43nData={}; cn43nNameMap={}; cn43nSuperMap={};
       rows.slice(1).forEach(r=>{
         const wbs=String(r[wbsIdx]||'').trim();
@@ -2890,8 +2893,8 @@ function handleCn43n(event){
         const st2=m?m[1]:st.slice(-2);
         if(wbs){
           cn43nData[wbs]=st2;
-          cn43nNameMap[wbs]=String(r[3]||'').trim();   // col D = ชื่องาน
-          cn43nSuperMap[wbs]=String(r[5]||'').trim();  // col F = ผู้ควบคุมงาน
+          cn43nNameMap[wbs]=nameIdx>=0?String(r[nameIdx]||'').trim():String(r[1]||'').trim();
+          cn43nSuperMap[wbs]=superIdx>=0?String(r[superIdx]||'').trim():String(r[3]||'').trim();
         }
       });
       const count=Object.keys(cn43nData).length;
