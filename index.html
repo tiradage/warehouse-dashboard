@@ -7015,6 +7015,13 @@ function runRecommend(){
   const ss23Empty = (_ssData.ss23||[]).length===0;
   if(ss21Empty && !_ss21Loaded){ _ss21Loaded=true; fetchSafetyStock('ss21'); showToast('กำลังโหลด Safety Stock 0021…'); setTimeout(runRecommend,2500); return; }
   if(ss23Empty && !_ss23Loaded){ _ss23Loaded=true; fetchSafetyStock('ss23'); showToast('กำลังโหลด Safety Stock 0023…'); setTimeout(runRecommend,2500); return; }
+
+  // ใช้ setTimeout เพื่อไม่ block UI thread
+  const rcStats=document.getElementById('rcStats');
+  const rcBody=document.getElementById('rcBody');
+  if(rcBody) rcBody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted)">🔄 กำลังวิเคราะห์...</td></tr>';
+
+  setTimeout(function(){
   const c1 = document.getElementById('rc1')?.checked;
   const c2a = document.getElementById('rc2a')?.checked;
   const c2b = document.getElementById('rc2b')?.checked;
@@ -7026,26 +7033,18 @@ function runRecommend(){
   const ssMap21={}, ssMap23={};
   (_ssData.ss21||[]).forEach(function(r){ ssMap21[r.code]=parseFloat(r.ss||r.ssQty||0)||0; });
   (_ssData.ss23||[]).forEach(function(r){ ssMap23[r.code]=parseFloat(r.ss||r.ssQty||0)||0; });
-  // ── helper: stock เฉพาะ wh ที่ต้องการ (batch N+ว่าง, DEFAULT_WH)
-  function getStockByWh(code, whFilter){
-    // whFilter = null → ใช้ DEFAULT_WH, 'all' → รวมทุก wh
-    var t=0;
-    (invData||[]).forEach(function(inv){
-      if(inv.code!==code) return;
-      if(inv.batch && inv.batch!=='N' && inv.batch!=='') return;
-      if(inv.whStock){
-        Object.entries(inv.whStock).forEach(function(e){
-          var wh=e[0], v=parseFloat(e[1])||0;
-          if(whFilter===null){
-            if(DEFAULT_WH.has(wh)||wh==='') t+=v;
-          } else if(whFilter===wh){ t+=v; }
-        });
-      } else if(!whFilter||whFilter===null){
-        t+=parseFloat(inv.stock)||0;
-      }
+
+  // ── pre-compute stk21/stk23 ต่อ code (ไม่วน loop ซ้ำต่อ code)
+  const preStk21={}, preStk23={};
+  (invData||[]).forEach(function(inv){
+    if(inv.batch && inv.batch!=='N' && inv.batch!=='') return;
+    if(!inv.whStock) return;
+    Object.entries(inv.whStock).forEach(function(e){
+      var wh=e[0], v=parseFloat(e[1])||0;
+      if(wh==='0021'){ preStk21[inv.code]=(preStk21[inv.code]||0)+v; }
+      if(wh==='0023'){ preStk23[inv.code]=(preStk23[inv.code]||0)+v; }
     });
-    return Math.round(t*100)/100;
-  }
+  });
 
   // ZMB25
   const zmbMap = {};
@@ -7092,9 +7091,9 @@ function runRecommend(){
     const ml = avg>0 ? Math.round((stock/avg)*10)/10 : (stock===0?0:null);
     const ss21v=ssMap21[r.code]||0;
     const ss23v=ssMap23[r.code]||0;
-    // stock เฉพาะ wh 0021 และ 0023 สำหรับเปรียบเทียบ SS
-    const stk21=getStockByWh(r.code,'0021');
-    const stk23=getStockByWh(r.code,'0023');
+    // stock เฉพาะ wh 0021 และ 0023
+    const stk21=Math.round((preStk21[r.code]||0)*100)/100;
+    const stk23=Math.round((preStk23[r.code]||0)*100)/100;
     const demand = zmbMap[r.code]||0;
     const nopo = computePending(r.code,'nopo');
     const p103 = computePending(r.code,'103');
@@ -7160,6 +7159,7 @@ function runRecommend(){
     '<div class="sc"><div class="sc-label">⚪ ติดตาม</div><div class="sc-val">'+pLv(5)+'</div></div>';
 
   renderRecommend();
+  }, 0); // end setTimeout — ปล่อยให้ browser render ก่อนคำนวณ
 }
 
 function renderRecommend(){
