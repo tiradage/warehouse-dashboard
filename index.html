@@ -244,17 +244,27 @@ window.loadCloudData = async function(){
   if(window._loadCloudDataResolve){ window._loadCloudDataResolve(); window._loadCloudDataResolve=null; }
   window.showToast&&window.showToast('กำลังโหลดข้อมูลล่าสุดจาก cloud…');
   try{
-    const [mb52Raw, zmbRaw, cn43nRaw, whRaw, groupRaw] = await Promise.all([
+    const [mb52Raw, zmbRaw, cn43nRaw, whRaw_meta, groupRaw] = await Promise.all([
       window.fbLoad('mb52'),
       window.fbLoad('zmb25'),
       window.fbLoad('cn43n'),
-      window.fbLoad('mb52_wh'),
+      window.fbLoad('mb52_wh_meta'),
       window.fbLoad('groupMap')
     ]);
     if(mb52Raw){
       invData = mb52Raw.invData || [];
-      // merge whStock/whValue กลับเข้า invData
-      if(whRaw){
+      // โหลด whStock จาก chunk ต่างๆ
+      let whRaw = {};
+      const numChunks = (whRaw_meta && whRaw_meta.chunks) ? whRaw_meta.chunks : 1;
+      try {
+        const chunkLoads = [];
+        for(let ci=0; ci<numChunks; ci++) chunkLoads.push(window.fbLoad('mb52_wh_'+ci));
+        // ลอง load mb52_wh เก่าด้วย (backward compat)
+        chunkLoads.push(window.fbLoad('mb52_wh'));
+        const chunkResults = await Promise.all(chunkLoads);
+        chunkResults.forEach(c=>{ if(c) Object.assign(whRaw, c); });
+      } catch(e) { console.warn('whStock load error', e); }
+      if(Object.keys(whRaw).length>0){
         invData = invData.map(d=>{
           const k = d.code+'||'+(d.batch||'');
           const wh = whRaw[k];
@@ -3356,17 +3366,23 @@ function handleFile(event){
           stock:d.stock||0, value:d.value||0, unit:d.unit||'',
           warehouses:d.warehouses||''
         }));
-        // บันทึก whStock/whValue แยก (code+batch → {whStock,whValue})
+        // บันทึก whStock/whValue แยก (แบ่ง chunk ละ 500 รายการ ป้องกัน Firestore 1MB limit)
         const whData = {};
         invData.forEach(d=>{
           const k = d.code+'||'+(d.batch||'');
           if(d.whStock && Object.keys(d.whStock).length>0)
             whData[k] = {whStock:d.whStock, whValue:d.whValue||{}};
         });
-        Promise.all([
-          window.fbSave('mb52',{invData:invDataMin, date:Date.now()}),
-          window.fbSave('mb52_wh', whData)
-        ]).then(()=>showToast('บันทึก cloud สำเร็จ ✓'));
+        const whEntries = Object.entries(whData);
+        const CHUNK = 500;
+        const savePromises = [window.fbSave('mb52',{invData:invDataMin, date:Date.now()})];
+        for(let ci=0; ci<Math.ceil(whEntries.length/CHUNK); ci++){
+          const chunk = Object.fromEntries(whEntries.slice(ci*CHUNK, (ci+1)*CHUNK));
+          savePromises.push(window.fbSave('mb52_wh_'+ci, chunk));
+        }
+        // บันทึกจำนวน chunk ไว้ด้วย
+        savePromises.push(window.fbSave('mb52_wh_meta', {chunks: Math.ceil(whEntries.length/CHUNK)}));
+        Promise.all(savePromises).then(()=>showToast('บันทึก cloud สำเร็จ ✓')).catch(err=>showToast('บันทึก cloud บางส่วนไม่สำเร็จ: '+err.message, true));
       }
     } catch(err){
       showToast('อ่านไฟล์ไม่สำเร็จ: '+err.message, true);
