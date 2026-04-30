@@ -3231,20 +3231,32 @@ function handleFile(event){
       const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
       if(!rows||rows.length<2){ showToast('ไม่พบข้อมูลในไฟล์',true); return; }
 
-      // Parse: col0=วัสดุ, col2=คลัง, col7=แบทช์, col8=หน่วย, col9=stock, col12=value
+      // Auto-detect format: ใหม่มี header "วัสดุ","ที่ใช้ได้" / เก่าใช้ col index
+      const hdr = rows[0].map(v=>String(v||'').trim());
+      const isNew = hdr.includes('วัสดุ') && hdr.includes('ที่ใช้ได้');
+      const iCode  = isNew ? hdr.indexOf('วัสดุ')           : 0;
+      const iName  = isNew ? hdr.indexOf('คำอธิบายวัสดุ')   : -1;
+      const iWh    = isNew ? hdr.indexOf('ที่เก็บสินค้า')   : 2;
+      const iBatch = isNew ? hdr.indexOf('แบทช์')            : 7;
+      const iUnit  = isNew ? hdr.indexOf('หน่วยนับพื้นฐาน') : 8;
+      const iStock = isNew ? hdr.indexOf('ที่ใช้ได้')        : 9;
+      const iValue = isNew ? hdr.indexOf('ไม่จำกัดค่า')     : 12;
+
       const grouped = {};
       rows.slice(1).forEach(r=>{
-        const raw = r[0];
+        const raw = r[iCode];
         if(!raw) return;
         const code = String(raw).replace(/-/g,'').trim();
         if(!code||code==='0') return;
-        const stock = parseFloat(r[9])||0;
-        const value = parseFloat(r[12])||0;
-        const unit  = String(r[8]||'EA').trim();
-        const wh = r[2]!==undefined&&r[2]!==''
-          ? String(typeof r[2]==='number'?Math.round(r[2]):r[2]).trim().replace(/-/g,'').padStart(4,'0')
+        const stock = parseFloat(r[iStock])||0;
+        const value = parseFloat(r[iValue])||0;
+        const unit  = String(r[iUnit]||'EA').trim();
+        const whRaw = r[iWh];
+        const wh = whRaw!==undefined&&whRaw!==''
+          ? String(typeof whRaw==='number'?Math.round(whRaw):whRaw).trim().replace(/-/g,'').padStart(4,'0')
           : '';
-        const batch = r[7]?String(r[7]).trim():'';
+        const batch = r[iBatch]?String(r[iBatch]).trim():'';
+        if(iName>=0 && r[iName]) nameMap[code]=String(r[iName]).trim();
 
         // group by code+batch (1 แถวต่อ code+batch)
         const key = code+'||'+batch;
