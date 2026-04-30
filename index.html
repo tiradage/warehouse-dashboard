@@ -7052,10 +7052,12 @@ function runRecommend(){
 
   // PR map — ไม่นับสถานะ ยกเลิก
   const prMap = {};
-  (prData||[]).forEach(function(r){
-    if(r.s103==='ยกเลิก'&&r.s105==='ยกเลิก') return; // ข้ามรายการที่ยกเลิกทั้งคู่
-    if(!prMap[r.itemCode]) prMap[r.itemCode]=[];
-    prMap[r.itemCode].push(r);
+  (prData||[]).forEach(function(row){
+    if(row.s103==='ยกเลิก'&&row.s105==='ยกเลิก') return;
+    const key = String(row.itemCode||'').replace(/-/g,'').trim();
+    if(!key) return;
+    if(!prMap[key]) prMap[key]=[];
+    prMap[key].push(row);
   });
 
   // Group invData by code — batch N+ว่าง, DEFAULT_WH เท่านั้น
