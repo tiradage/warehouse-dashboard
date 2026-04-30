@@ -7197,7 +7197,7 @@ function renderRecommend(){
     // PR (รอขึ้น PO)
     var prNoPO=r.prList.filter(function(p){return (!p.poNo||p.poNo.trim()===''||p.poNo.trim()==='-')&&p.s103!=='ยกเลิก';});
     if(prNoPO.length){
-      var sumNoPO=prNoPO.reduce(function(s,p){return s+parseFloat(p.qty||0);},0);
+      var sumNoPO=prNoPO.reduce(function(s,p){return s+parseFloat(String(p.qty||0).replace(/,/g,''));},0);
       var budgets=[...new Set(prNoPO.map(function(p){return p.budget||'–';}).filter(Boolean))].join(', ');
       procureLines.push('<div style="display:flex;gap:6px;align-items:baseline;margin-bottom:3px">'+
         '<span style="font-size:.7rem;padding:1px 6px;border-radius:3px;background:rgba(255,107,107,.12);color:var(--accent2);white-space:nowrap;flex-shrink:0">PR รอ PO</span>'+
@@ -7208,7 +7208,7 @@ function renderRecommend(){
     // PO แล้ว (รอรับ 103)
     var prPO=r.prList.filter(function(p){return p.poNo&&p.poNo.trim()&&p.poNo.trim()!=='-'&&p.s103!=='รับแล้ว'&&p.s103!=='ยกเลิก';});
     if(prPO.length){
-      var sumPO=prPO.reduce(function(s,p){return s+parseFloat(p.qty||0);},0);
+      var sumPO=prPO.reduce(function(s,p){return s+parseFloat(String(p.qty||0).replace(/,/g,''));},0);
       var bdPO=[...new Set(prPO.map(function(p){return p.budget||'–';}).filter(Boolean))].join(', ');
       procureLines.push('<div style="display:flex;gap:6px;align-items:baseline;margin-bottom:3px">'+
         '<span style="font-size:.7rem;padding:1px 6px;border-radius:3px;background:rgba(255,201,60,.12);color:var(--accent3);white-space:nowrap;flex-shrink:0">PO รอรับ</span>'+
@@ -7249,8 +7249,8 @@ function exportRecommendCSV(){
     var prNoPO=r.prList.filter(function(p){return (!p.poNo||p.poNo.trim()===''||p.poNo.trim()==='-')&&p.s103!=='ยกเลิก';});
     var prPO=r.prList.filter(function(p){return p.poNo&&p.poNo.trim()&&p.poNo.trim()!=='-'&&p.s103!=='รับแล้ว'&&p.s103!=='ยกเลิก';});
     return [r.code,r.name,r.reasons.join(' | '),r.stock,r.avg>0?r.avg:'',r.ml!==null?r.ml:'',r.ss||'',r.demand||'',
-      prNoPO.reduce(function(s,p){return s+parseFloat(p.qty||0);},0)||'',
-      prPO.reduce(function(s,p){return s+parseFloat(p.qty||0);},0)||'',
+      prNoPO.reduce(function(s,p){return s+parseFloat(String(p.qty||0).replace(/,/g,''));},0)||'',
+      prPO.reduce(function(s,p){return s+parseFloat(String(p.qty||0).replace(/,/g,''));},0)||'',
       r.me2n||''];
   })),'recommend_export.csv');
 }
