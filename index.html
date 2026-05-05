@@ -7765,16 +7765,9 @@ var CC_DEFAULT_LOCS = [
 ];
 
 // ── Keywords คอนกรีต ──────────────────────────────────────────
-var CC_KEYWORDS = ['เสา','คอน','คาน','สมอบก','POLE','STUB','PILE','CROSSARM','BEAM','FOOTING','ANCHOR'];
-
+// รหัสคอนกรีตขึ้นต้นด้วย "100" เสมอ
 function _ccIsConcreteCode(code) {
-  var grp = (groupMap[code] || '').toLowerCase();
-  var name = (nameMap[code] || '').toLowerCase();
-  for (var i = 0; i < CC_KEYWORDS.length; i++) {
-    var kw = CC_KEYWORDS[i].toLowerCase();
-    if (grp.includes(kw) || name.includes(kw)) return true;
-  }
-  return false;
+  return String(code).startsWith('100');
 }
 
 // ── init เมื่อเปิด tab ─────────────────────────────────────────
@@ -7873,13 +7866,23 @@ function _ccLoadConcreteCodesFromInvData() {
     return;
   }
 
-  // แสดง badge
-  var codeSet = {};
-  _ccCodes.forEach(function(c) { codeSet[c.code] = c.name; });
-  preview.innerHTML = Object.keys(codeSet).map(function(code) {
-    return '<span style="font-size:.72rem;padding:3px 10px;border-radius:5px;background:var(--accent-l);color:var(--accent);border:1px solid rgba(123,31,162,.2);font-family:\'IBM Plex Mono\',monospace">' +
-      code + '</span>';
+  // แสดง badge แยก N และ R
+  var codeSetN = {}, codeSetR = {};
+  _ccCodes.forEach(function(c) {
+    if (c.batch === 'N') codeSetN[c.code] = c.name;
+    else if (c.batch === 'R') codeSetR[c.code] = c.name;
+  });
+  var totalCodes = Object.keys(codeSetN).length;
+  var totalR = Object.keys(codeSetR).length;
+  var batchNHtml = Object.keys(codeSetN).map(function(code) {
+    return '<span title="' + (codeSetN[code]||'') + '" style="font-size:.7rem;padding:2px 8px;border-radius:4px;background:var(--accent-l);color:var(--accent);border:1px solid rgba(123,31,162,.2);font-family:\'IBM Plex Mono\',monospace">' + code + '</span>';
   }).join('');
+  var batchRHtml = Object.keys(codeSetR).map(function(code) {
+    return '<span title="' + (codeSetR[code]||'') + '" style="font-size:.7rem;padding:2px 8px;border-radius:4px;background:var(--gold-l);color:var(--gold);border:1px solid rgba(240,165,0,.3);font-family:\'IBM Plex Mono\',monospace">' + code + '</span>';
+  }).join('');
+  preview.innerHTML =
+    '<div style="margin-bottom:6px"><span style="font-size:.7rem;font-weight:600;color:var(--accent);margin-right:6px">🟣 แบทช์ N (' + totalCodes + ' รหัส)</span>' + batchNHtml + '</div>' +
+    (totalR > 0 ? '<div><span style="font-size:.7rem;font-weight:600;color:var(--gold);margin-right:6px">🟡 แบทช์ R (' + totalR + ' รหัส)</span>' + batchRHtml + '</div>' : '<div style="font-size:.72rem;color:var(--muted)">⚠ ไม่พบ batch R ใน MB52</div>');
 }
 
 // ── Step Navigation ───────────────────────────────────────────
@@ -7919,126 +7922,130 @@ function ccExportExcel() {
     return;
   }
 
+  var validLocs = _ccLocs.filter(function(l) { return l.id && l.name; });
+  if (validLocs.length === 0) {
+    showToast('กรุณาเพิ่มกองหมอนอย่างน้อย 1 กอง', true);
+    return;
+  }
+
   var wb = XLSX.utils.book_new();
 
   // ── Sheet: คู่มือ ──────────────────────────────────────────
-  var guideData = [
+  var wsGuide = XLSX.utils.aoa_to_sheet([
     ['ระบบตรวจนับผลิตภัณฑ์คอนกรีต — กฟภ.กระบี่'],
     ['รอบตรวจนับ:', round],
     ['วันที่:', dateVal],
     [''],
     ['วิธีใช้:'],
-    ['1. กรอกยอดนับจริงในคอลัม "ยอดนับจริง" ของแต่ละกองหมอน'],
-    ['2. กรอกหมายเหตุ (ถ้ามี)'],
-    ['3. บันทึกไฟล์แล้วอัปโหลดกลับใน Dashboard'],
-    ['4. ระบบจะคำนวณผลต่างและสร้างรายงานให้อัตโนมัติ'],
+    ['1. กรอกยอดนับจริงในคอลัมสีเหลือง (แต่ละ sub-location)'],
+    ['2. คอลัม "รวมนับ" และ "ผลต่าง" คำนวณอัตโนมัติเมื่อ Upload กลับ'],
+    ['3. กรอกหมายเหตุ (ถ้ามี) ในคอลัมสุดท้าย'],
+    ['4. บันทึกแล้วอัปโหลดกลับใน Dashboard ขั้นตอน 2'],
     [''],
-    ['หมายเหตุ: ห้ามเปลี่ยนแปลงโครงสร้างตาราง, ชื่อ Sheet, และ row/col ที่ระบุ'],
-  ];
-  var wsGuide = XLSX.utils.aoa_to_sheet(guideData);
+    ['หมายเหตุ: ห้ามแก้ไข row 1-2 (header) และ col A-D'],
+  ]);
   XLSX.utils.book_append_sheet(wb, wsGuide, 'คู่มือ');
 
   // ── Sheet: แต่ละ Batch (N, R) ─────────────────────────────
+  // สร้าง sub-location structure
+  var locSubMap = validLocs.map(function(loc) {
+    var subs = loc.subs ? loc.subs.split(',').map(function(s){return s.trim();}).filter(Boolean) : ['ทั้งหมด'];
+    return {id: loc.id, name: loc.name, subs: subs};
+  });
+
+  // สร้าง header
+  var hdr1 = ['รหัสพัสดุ','ชื่อพัสดุ','หน่วย','ยอด SAP (รวม)'];
+  var hdr2 = ['','','',''];
+  // โครงสร้าง: [loc1_sub1, loc1_sub2, ..., loc1_รวม, loc2_sub1, ..., loc2_รวม, ..., หมายเหตุ]
+  locSubMap.forEach(function(loc) {
+    loc.subs.forEach(function(sub) {
+      hdr1.push(loc.id);
+      hdr2.push(sub);
+    });
+    hdr1.push('รวมนับ ' + loc.id);
+    hdr2.push('(auto)');
+  });
+  hdr1.push('หมายเหตุ');
+  hdr2.push('');
+
+  // คำนวณ col index map สำหรับ upload parser
+  var colStructure = []; // [{type:'sap'|'sub'|'sum'|'note', locId, sub}]
+  colStructure.push({type:'code'});
+  colStructure.push({type:'name'});
+  colStructure.push({type:'unit'});
+  colStructure.push({type:'sap'});
+  locSubMap.forEach(function(loc) {
+    loc.subs.forEach(function(sub) {
+      colStructure.push({type:'sub', locId:loc.id, locName:loc.name, sub:sub});
+    });
+    colStructure.push({type:'sum', locId:loc.id});
+  });
+  colStructure.push({type:'note'});
+
   var batches = ['N', 'R'];
   batches.forEach(function(batch) {
     var codes = _ccCodes.filter(function(c) { return c.batch === batch; });
     if (codes.length === 0) return;
 
-    // สร้าง sub-location cols
-    var validLocs = _ccLocs.filter(function(l) { return l.id && l.name; });
-    if (validLocs.length === 0) {
-      showToast('กรุณาเพิ่มกองหมอนอย่างน้อย 1 กอง', true);
-      return;
-    }
-
-    // Header row 1: รหัส, ชื่อ, หน่วย, SAP รวม, [loc1 sub1..subN, รวมนับ, ผลต่าง, หมายเหตุ] ต่อ loc
-    var hdr1 = ['รหัสพัสดุ', 'ชื่อพัสดุ', 'หน่วย', 'ยอด SAP (รวม)'];
-    var hdr2 = ['', '', '', ''];
-
-    validLocs.forEach(function(loc) {
-      var subs = loc.subs ? loc.subs.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : ['ทั้งหมด'];
-      subs.forEach(function(sub) {
-        hdr1.push(loc.id + ' ' + loc.name);
-        hdr2.push(sub);
-      });
-      hdr1.push('รวมนับ ' + loc.id);
-      hdr2.push('');
-      hdr1.push('ผลต่าง ' + loc.id);
-      hdr2.push('');
-    });
-    hdr1.push('รวมนับทั้งหมด', 'ผลต่างรวม', 'หมายเหตุ');
-    hdr2.push('', '', '');
-
-    // Data rows
+    // สร้าง data rows (ค่าตัวเลขล้วน ไม่ใช้ formula เพื่อหลีกเลี่ยง 32767 char limit)
     var dataRows = codes.map(function(c) {
       var row = [c.code, c.name, c.unit, c.sapStock];
-      validLocs.forEach(function(loc) {
-        var subs = loc.subs ? loc.subs.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : ['ทั้งหมด'];
-        var subCount = subs.length;
-        subs.forEach(function() { row.push(''); }); // กรอกยอดนับ
-        // รวมนับ = SUM(sub cols)
-        row.push(''); // placeholder — จะ set formula ทีหลัง
-        row.push(''); // ผลต่าง
+      locSubMap.forEach(function(loc) {
+        loc.subs.forEach(function() { row.push(0); }); // ช่องกรอก
+        row.push(0); // รวมนับ (กรอก 0 ไว้ จะ recalc ตอน upload)
       });
-      row.push('', '', ''); // รวมนับทั้งหมด, ผลต่างรวม, หมายเหตุ
+      row.push(''); // หมายเหตุ
       return row;
     });
 
     var sheetData = [hdr1, hdr2].concat(dataRows);
     var ws = XLSX.utils.aoa_to_sheet(sheetData);
 
-    // เพิ่ม metadata ซ่อนใน cell A1 comment — ใช้วิธี custom property แทน
-    // บันทึก meta ใน sheet ท้ายสุด (ไม่ซ่อน)
-    // ใส่ formula SUM สำหรับ "รวมนับ" และ "ผลต่าง"
-    var totalCols = hdr1.length;
-    for (var ri = 2; ri < sheetData.length; ri++) { // 0-indexed, row 2 = data start
-      var colIdx = 4; // เริ่มหลัง SAP col (A=0,B=1,C=2,D=3,E=4)
-      validLocs.forEach(function(loc) {
-        var subs = loc.subs ? loc.subs.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : ['ทั้งหมด'];
-        var subCount = subs.length;
-        var subStartCol = colIdx;
-        colIdx += subCount;
-        // รวมนับ col
-        var sumRef = '';
-        for (var sc = subStartCol; sc < subStartCol + subCount; sc++) {
-          sumRef += XLSX.utils.encode_cell({r: ri, c: sc}) + '+';
-        }
-        sumRef = sumRef.replace(/\+$/, '');
-        var sumCell = XLSX.utils.encode_cell({r: ri, c: colIdx});
-        ws[sumCell] = {t: 'n', f: sumRef || '0'};
-        // ผลต่าง = รวมนับ - SAP (col D = index 3)
-        var sapCell = XLSX.utils.encode_cell({r: ri, c: 3});
-        var diffCell = XLSX.utils.encode_cell({r: ri, c: colIdx + 1});
-        ws[diffCell] = {t: 'n', f: sumCell + '-D' + (ri + 1)};
-        colIdx += 2;
-      });
-    }
+    // col widths
+    var colWidths = [{wch:14},{wch:36},{wch:7},{wch:10}];
+    locSubMap.forEach(function(loc) {
+      loc.subs.forEach(function() { colWidths.push({wch:10}); });
+      colWidths.push({wch:10}); // รวมนับ
+    });
+    colWidths.push({wch:20}); // หมายเหตุ
+    ws['!cols'] = colWidths;
 
-    // style: lock header, highlight input cols
-    ws['!cols'] = [{wch:14},{wch:32},{wch:8},{wch:12}];
-    var rng = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
-    ws['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:sheetData.length-1, c:hdr1.length-1}});
+    // ล็อก range ให้ครบ
+    ws['!ref'] = XLSX.utils.encode_range({
+      s:{r:0,c:0}, e:{r:sheetData.length-1, c:hdr1.length-1}
+    });
 
-    XLSX.utils.book_append_sheet(wb, ws, 'แบทช์' + batch);
+    XLSX.utils.book_append_sheet(wb, ws, 'แบทช' + batch);
   });
 
-  // ── Sheet: META (เก็บ metadata สำหรับ upload กลับ) ──────────
-  var metaData = [
-    ['__CONCRETE_COUNT_META__', '1'],
+  // ── Sheet: META — เก็บ structure สำหรับ upload parser ────────
+  // แยกเป็น rows ย่อย เพื่อป้องกัน 32767 char limit
+  var metaLocs = _ccLocs.map(function(l){return l.id+'|'+l.name+'|'+(l.subs||'');}).join(';;');
+  var codesN = _ccCodes.filter(function(c){return c.batch==='N';})
+    .map(function(c){return c.code+','+c.sapStock;}).join(';');
+  var codesR = _ccCodes.filter(function(c){return c.batch==='R';})
+    .map(function(c){return c.code+','+c.sapStock;}).join(';');
+
+  var wsMeta = XLSX.utils.aoa_to_sheet([
+    ['__CONCRETE_COUNT_META__','1'],
     ['round', round],
     ['date', dateVal],
-    ['locs', JSON.stringify(_ccLocs)],
-    ['codes', JSON.stringify(_ccCodes.map(function(c){ return {code:c.code,name:c.name,batch:c.batch,sapStock:c.sapStock,unit:c.unit}; }))],
-  ];
-  var wsMeta = XLSX.utils.aoa_to_sheet(metaData);
+    ['locs', metaLocs],
+    ['codesN', codesN],
+    ['codesR', codesR],
+  ]);
   XLSX.utils.book_append_sheet(wb, wsMeta, '__META__');
 
   // ── Download ──────────────────────────────────────────────
-  var today = new Date();
-  var fname = 'ตรวจนับคอนกรีต_' + today.getFullYear() + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0') + '.xlsx';
-  XLSX.writeFile(wb, fname);
-  showToast('Export Excel สำเร็จ ✓ — กรอกยอดนับแล้ว Upload กลับ');
-  ccGoStep(2);
+  var d = new Date();
+  var fname = 'ตรวจนับคอนกรีต_' + d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + '.xlsx';
+  try {
+    XLSX.writeFile(wb, fname);
+    showToast('Export สำเร็จ ' + _ccCodes.length + ' รายการ ✓');
+    ccGoStep(2);
+  } catch(err) {
+    showToast('Export ไม่สำเร็จ: ' + err.message, true);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -8072,98 +8079,102 @@ function ccHandleUpload(event) {
 
       _ccRound = meta['round'] || '';
       _ccDate = meta['date'] || '';
-      var locs = JSON.parse(meta['locs'] || '[]');
-      var codes = JSON.parse(meta['codes'] || '[]');
+
+      // parse locs จาก format "id|name|subs;;id2|name2|subs2"
+      var locsRaw = String(meta['locs'] || '');
+      var locs = locsRaw ? locsRaw.split(';;').map(function(s){
+        var p = s.split('|');
+        return {id: p[0]||'', name: p[1]||'', subs: p[2]||''};
+      }).filter(function(l){return l.id;}) : [];
+
+      // parse codes จาก format "code,sap;code2,sap2"
+      var codesNRaw = String(meta['codesN'] || '');
+      var codesRRaw = String(meta['codesR'] || '');
+      var codesSapMap = {}; // code → sapStock (batch N และ R รวมกัน)
+      [codesNRaw, codesRRaw].forEach(function(raw) {
+        if (!raw) return;
+        raw.split(';').forEach(function(s) {
+          var p = s.split(',');
+          if (p[0]) codesSapMap[p[0]] = parseFloat(p[1]) || 0;
+        });
+      });
 
       // parse แต่ละ batch sheet
       _ccResult = [];
       var batches = ['N', 'R'];
 
       batches.forEach(function(batch) {
-        var sheetName = 'แบทช์' + batch;
-        var ws = wb.Sheets[sheetName];
+        // รองรับทั้ง "แบทช์N" (เก่า) และ "แบทชN" (ใหม่)
+        var ws = wb.Sheets['แบทช' + batch] || wb.Sheets['แบทช์' + batch];
         if (!ws) return;
 
         var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
         if (rows.length < 3) return;
 
-        var hdr1 = rows[0]; // row 0: ชื่อกอง
-        var hdr2 = rows[1]; // row 1: sub-location
+        var hdr1 = rows[0]; // row 0: locId หรือ label
+        var hdr2 = rows[1]; // row 1: sub-location name
 
-        // map col index → {locId, locName, sub}
-        var colMap = [];
-        var sumColMap = {}; // locId → colIdx ของ "รวมนับ"
-        var curLoc = null;
+        // สร้าง colMap จาก header
+        // format ใหม่: col 0=code,1=name,2=unit,3=sap, 4..=sub cols, sumCol, ..., note
+        var colMap = []; // index relative to col 4
+        var curLocId = null;
         for (var ci = 4; ci < hdr1.length; ci++) {
           var h1 = String(hdr1[ci] || '').trim();
           var h2 = String(hdr2[ci] || '').trim();
           if (h1.startsWith('รวมนับ')) {
-            if (curLoc) sumColMap[curLoc] = ci;
-            colMap.push({type:'sum', locId: curLoc});
-            ci++; // skip ผลต่าง
-            colMap.push({type:'diff', locId: curLoc});
-          } else if (h1 === 'รวมนับทั้งหมด') {
-            colMap.push({type:'total'});
-            ci++; // skip ผลต่างรวม
-            colMap.push({type:'totalDiff'});
-            ci++; // skip หมายเหตุ
-            colMap.push({type:'note'});
-            break;
-          } else if (h1) {
-            // extract locId (first word)
-            var parts = h1.split(' ');
-            curLoc = parts[0];
-            colMap.push({type:'sub', locId: curLoc, locName: parts.slice(1).join(' '), sub: h2});
+            colMap.push({type:'sum', locId: curLocId, ci: ci});
+          } else if (h1 === 'หมายเหตุ' || (ci === hdr1.length - 1 && !h1.startsWith('รวม'))) {
+            colMap.push({type:'note', ci: ci});
+          } else if (h2 === '(auto)') {
+            colMap.push({type:'sum', locId: curLocId, ci: ci});
           } else {
-            colMap.push({type:'sub', locId: curLoc, locName: '', sub: h2});
+            // sub-location col — h1 คือ locId
+            if (h1 && !h1.startsWith('รวม')) curLocId = h1;
+            colMap.push({type:'sub', locId: curLocId, sub: h2, ci: ci});
           }
         }
 
         // Data rows
         for (var ri = 2; ri < rows.length; ri++) {
           var row = rows[ri];
-          var code = String(row[0] || '').trim();
-          if (!code) continue;
-          var sapStock = parseFloat(row[3]) || 0;
+          var code = String(row[0] || '').replace(/-/g,'').trim();
+          if (!code || code === 'รหัสพัสดุ') continue;
+          var sapStock = parseFloat(row[3]) || codesSapMap[code] || 0;
           var note = '';
 
-          // รวมยอดนับแยกตามกอง
-          var locTotals = {}; // locId → counted
-          for (var mi = 0; mi < colMap.length; mi++) {
-            var cm = colMap[mi];
-            var val = parseFloat(row[mi + 4]) || 0;
+          // sum per locId
+          var locTotals = {};
+          colMap.forEach(function(cm) {
+            var val = parseFloat(row[cm.ci]) || 0;
             if (cm.type === 'sub') {
               if (!locTotals[cm.locId]) locTotals[cm.locId] = 0;
               locTotals[cm.locId] += val;
             } else if (cm.type === 'note') {
-              note = String(row[mi + 4] || '').trim();
+              note = String(row[cm.ci] || '').trim();
             }
-          }
-
-          // สร้าง result row ต่อ กอง
-          var hasAnyCount = false;
-          locs.filter(function(l){return l.id;}).forEach(function(loc) {
-            var counted = locTotals[loc.id] || 0;
-            if (counted > 0) hasAnyCount = true;
-            _ccResult.push({
-              code: code,
-              name: nameMap[code] || String(row[1] || ''),
-              batch: batch,
-              wh: loc.id,
-              whName: loc.name,
-              sapStock: sapStock,
-              counted: counted,
-              diff: counted - sapStock,
-              note: note
-            });
           });
 
-          // ถ้าไม่มีกองเลย → 1 row รวม
-          if (!locs.filter(function(l){return l.id;}).length) {
+          // ถ้ากรอกยอดรวมทั้งหมด (ไม่แยกกอง)
+          var hasLoc = locs.length > 0;
+          if (hasLoc) {
+            locs.forEach(function(loc) {
+              var counted = locTotals[loc.id] || 0;
+              _ccResult.push({
+                code: code,
+                name: nameMap[code] || String(row[1] || ''),
+                batch: batch,
+                wh: loc.id,
+                whName: loc.name,
+                sapStock: sapStock,
+                counted: counted,
+                diff: counted - sapStock,
+                note: note
+              });
+            });
+          } else {
+            // ไม่มีกอง → row รวม
             var total = 0;
-            for (var mi2 = 0; mi2 < colMap.length; mi2++) {
-              if (colMap[mi2].type === 'sum') total = parseFloat(row[mi2+4]) || total;
-            }
+            colMap.forEach(function(cm){ if(cm.type==='sub') total += parseFloat(row[cm.ci])||0; });
             _ccResult.push({code:code, name:nameMap[code]||String(row[1]||''), batch:batch,
               wh:'', whName:'รวม', sapStock:sapStock, counted:total, diff:total-sapStock, note:note});
           }
