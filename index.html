@@ -8139,22 +8139,25 @@ function ccHandleUpload(event) {
           var g = String(grpHdr[ci]||'').trim();
           var d = String(detHdr[ci]||'').trim();
 
-          if (g === 'สรุปรวม') {
+          var gn = g.replace(/[\r\n]+/g,'').trim();
+          if (gn === 'สรุปรวม') {
             // สรุปรวม block
             colMap.push({type:'totalCnt',  ci: ci});
             colMap.push({type:'totalDiff', ci: ci+1});
             break;
           }
-          if (g) {
-            // เริ่ม group ใหม่ — extract locId (คำแรกก่อน space)
-            curLocId = g.split(/\s+/)[0];
+          if (gn) {
+            // เริ่ม group ใหม่ — extract locId (คำแรกก่อน space/newline)
+            curLocId = gn.split(/\s+/)[0];
           }
 
-          if (d === 'SAP(กอง)')      colMap.push({type:'sap',  locId:curLocId, ci:ci});
-          else if (d === 'นับรวม(กอง)') colMap.push({type:'cnt',  locId:curLocId, ci:ci});
-          else if (d === 'ผลต่าง(กอง)') colMap.push({type:'diff', locId:curLocId, ci:ci});
-          else if (d === 'หมายเหตุ')    colMap.push({type:'note', locId:curLocId, ci:ci});
-          else if (d && curLocId)       colMap.push({type:'sub',  locId:curLocId, subName:d, ci:ci});
+          // normalize: ลบ newline และ whitespace ออกก่อน match
+          var dn = d.replace(/[\r\n]+/g,'').trim();
+          if (dn === 'SAP(กอง)')       colMap.push({type:'sap',  locId:curLocId, ci:ci});
+          else if (dn === 'นับรวม(กอง)') colMap.push({type:'cnt',  locId:curLocId, ci:ci});
+          else if (dn === 'ผลต่าง(กอง)') colMap.push({type:'diff', locId:curLocId, ci:ci});
+          else if (dn === 'หมายเหตุ' || d === 'หมายเหตุ') colMap.push({type:'note', locId:curLocId, ci:ci});
+          else if (d && curLocId)        colMap.push({type:'sub',  locId:curLocId, subName:dn||d, ci:ci});
         }
 
         var sapMap = batch==='N' ? sapMapN : sapMapR;
