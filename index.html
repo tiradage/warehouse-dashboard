@@ -2579,14 +2579,18 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
 
     <!-- STEP 1: ตั้งค่า & Export -->
     <div id="ccPanel1">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
         <div>
           <div style="font-size:.72rem;color:var(--muted);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">รอบที่ตรวจนับ</div>
           <input type="text" id="ccRound" placeholder="เช่น รอบที่ 1/2568" style="width:100%;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:.88rem;outline:none">
         </div>
         <div>
-          <div style="font-size:.72rem;color:var(--muted);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">วันที่ตรวจนับ</div>
-          <input type="date" id="ccDate" style="width:100%;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:.88rem;outline:none;color-scheme:dark">
+          <div style="font-size:.72rem;color:var(--muted);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">ช่วงวันที่ตรวจนับ</div>
+          <input type="text" id="ccDate" placeholder="เช่น 16 มี.ค. 2569 - 18 มี.ค. 2569" style="width:100%;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:.88rem;outline:none">
+        </div>
+        <div>
+          <div style="font-size:.72rem;color:var(--muted);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">วันที่อ้างอิงข้อมูล MB52</div>
+          <input type="text" id="ccMb52Date" placeholder="เช่น 15 มี.ค. 2569" style="width:100%;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:.88rem;outline:none">
         </div>
       </div>
 
@@ -7766,6 +7770,7 @@ var _ccCodes = []; // [{code, name, batch, sapStock}] — จาก MB52
 var _ccResult = []; // [{code, name, batch, wh, whName, sapStock, counted, diff, note}]
 var _ccRound = '';
 var _ccDate = '';
+var _ccMb52Date = '';
 
 // ── Default กองหมอน ────────────────────────────────────────────
 var CC_DEFAULT_LOCS = [
@@ -7786,18 +7791,21 @@ function _ccIsConcreteCode(code) {
 
 // ── init เมื่อเปิด tab ─────────────────────────────────────────
 function initConcreteCount() {
-  // set today + ชื่อรอบอัตโนมัติ
+  // set default values
   var today = new Date();
-  var iso = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
-  var dateEl = document.getElementById('ccDate');
-  if (dateEl && !dateEl.value) dateEl.value = iso;
-  // default รอบ = "ตรวจนับประจำเดือน <เดือนไทย> <ปีพ.ศ.>"
+  var thMonths = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                  'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  var thMonth = thMonths[today.getMonth()];
+  var thYear  = today.getFullYear() + 543;
+  var thDay   = today.getDate();
+
+  // ชื่อรอบ
   var roundEl = document.getElementById('ccRound');
   if (roundEl && !roundEl.value) {
-    var thMonths = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
-                    'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-    roundEl.value = 'ตรวจนับประจำเดือน ' + thMonths[today.getMonth()] + ' ' + (today.getFullYear()+543);
+    roundEl.value = 'ตรวจนับผลิตภัณฑ์คอนกรีต ประจำเดือน ' + thMonth + ' ' + thYear;
   }
+  // ช่วงวันที่ตรวจนับ (กรอกเอง — ไม่ set default เพราะต้องการช่วงวันที่)
+  // วันที่อ้างอิง MB52 (กรอกเอง)
 
   // โหลด default locs ถ้ายังไม่มี
   if (_ccLocs.length === 0) {
@@ -7933,10 +7941,12 @@ function _esc(s) {
 function ccExportExcel() {
   if (!window.XLSX) { showToast('XLSX library ยังโหลดไม่เสร็จ', true); return; }
 
-  var round  = (document.getElementById('ccRound') || {}).value || ('รอบ ' + new Date().toLocaleDateString('th-TH'));
-  var dateVal = (document.getElementById('ccDate') || {}).value || '';
-  _ccRound = round;
-  _ccDate  = dateVal;
+  var round     = (document.getElementById('ccRound')    || {}).value || ('รอบ ' + new Date().toLocaleDateString('th-TH'));
+  var dateVal   = (document.getElementById('ccDate')     || {}).value || '';
+  var mb52Date  = (document.getElementById('ccMb52Date') || {}).value || '';
+  _ccRound   = round;
+  _ccDate    = dateVal;
+  _ccMb52Date = mb52Date;
 
   _ccLoadConcreteCodesFromInvData();
   if (_ccCodes.length === 0) { showToast('ไม่พบรหัสคอนกรีตใน MB52 กรุณาโหลดข้อมูลก่อน', true); return; }
@@ -8058,7 +8068,7 @@ function ccExportExcel() {
 
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
     ['__CONCRETE_COUNT_META__','1'],
-    ['round', round], ['date', dateVal],
+    ['round', round], ['date', dateVal], ['mb52date', mb52Date],
     ['locs', metaLocs], ['codesN', codesN], ['codesR', codesR],
   ]), '__META__');
 
@@ -8099,8 +8109,9 @@ function ccHandleUpload(event) {
       metaRows.forEach(function(r){ if(r[0]) meta[String(r[0])] = r[1]; });
       if (!meta['__CONCRETE_COUNT_META__']) throw new Error('ไฟล์นี้ไม่ใช่แบบฟอร์มตรวจนับจากระบบ');
 
-      _ccRound = meta['round'] || '';
-      _ccDate  = meta['date']  || '';
+      _ccRound    = meta['round']    || '';
+      _ccDate     = meta['date']     || '';
+      _ccMb52Date = meta['mb52date'] || '';
 
       // parse locs จาก "id|name|subs;;..."
       var locs = String(meta['locs']||'').split(';;').map(function(s){
@@ -8375,7 +8386,8 @@ function ccPrintPDF() {
     '<div style="text-align:center;margin-bottom:12px">' +
     '<div style="font-size:15px;font-weight:700">รายงานยอดตรวจนับผลิตภัณฑ์คอนกรีต</div>' +
     '<div style="font-size:13px;margin-top:3px">การไฟฟ้าส่วนภูมิภาคจังหวัดกระบี่ (กฟภ.กระบี่)</div>' +
-    '<div style="font-size:12px;color:#6b7280">' + _ccRound + ' | วันที่ตรวจนับ: ' + dateStr + '</div>' +
+    '<div style="font-size:12px;color:#6b7280">' + _ccRound + '</div>' +
+    '<div style="font-size:11px;color:#6b7280">วันที่ตรวจนับ: ' + (_ccDate||'–') + (_ccMb52Date ? ' | ข้อมูล MB52 ณ ' + _ccMb52Date : '') + '</div>' +
     '</div>' +
     '<table>' +
     '<thead><tr style="background:#f3f0ff;border-bottom:2px solid #6d28d9">' +
@@ -8420,11 +8432,11 @@ async function ccSaveStat() {
   var now = new Date().toLocaleString('th-TH');
 
   // header + data rows
-  var header = [['รอบตรวจนับ','วันที่','แบทช์','รหัสพัสดุ','ชื่อพัสดุ',
+  var header = [['รอบตรวจนับ','ช่วงวันที่ตรวจนับ','วันที่อ้างอิง MB52','แบทช์','รหัสพัสดุ','ชื่อพัสดุ',
                  'กอง','ชื่อกอง','SAP(กอง)','นับ(กอง)','ผลต่าง(กอง)',
                  'SAP(รวม)','นับ(รวม)','ผลต่าง(รวม)','หมายเหตุ','บันทึกเมื่อ']];
   var dataRows = _ccResult.map(function(r) {
-    return [_ccRound, _ccDate, r.batch, r.code, r.name,
+    return [_ccRound, _ccDate, _ccMb52Date, r.batch, r.code, r.name,
             r.wh, r.whName, r.sapStock, r.counted, r.diff,
             r.sapTotal||r.sapStock, r.counted, r.diffTotal||r.diff,
             r.note||'', now];
