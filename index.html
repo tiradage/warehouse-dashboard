@@ -8439,9 +8439,7 @@ async function ccSaveStat() {
     // เตือนถ้ารอบนี้มีข้อมูลแล้ว
     var dupFound = !isEmpty && existRows.slice(1).some(function(r){ return r[0] === _ccRound; });
     if (dupFound) {
-      if (!confirm('⚠️ รอบ "' + _ccRound + '" มีข้อมูลอยู่ใน CONCRETE_STAT แล้ว
-
-ยืนยันบันทึกเพิ่มหรือไม่?')) return;
+      if (!confirm('⚠️ รอบ "' + _ccRound + '" มีข้อมูลอยู่ใน CONCRETE_STAT แล้ว ยืนยันบันทึกเพิ่มหรือไม่?')) return;
     }
 
     var toWrite = isEmpty ? header.concat(dataRows) : dataRows;
