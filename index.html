@@ -8427,7 +8427,48 @@ function ccPrintPDF() {
 async function ccSaveStat() {
   if (!_ccResult.length) { showToast('ไม่มีข้อมูล', true); return; }
   try { await ensureToken(); } catch(e) { showToast('กรุณา Login ด้วย Google ก่อน', true); return; }
+  // เปิด modal ให้กรอกข้อมูลก่อนบันทึก
+  ccOpenSaveModal(); return;
+}
 
+function ccOpenSaveModal() {
+  // pre-fill จาก Step 1 ถ้ามี
+  var r = document.getElementById('ccSaveRound');
+  var d = document.getElementById('ccSaveDate');
+  var m = document.getElementById('ccSaveMb52Date');
+  var w = document.getElementById('ccSaveModalWarn');
+  if (r) r.value = _ccRound || (document.getElementById('ccRound')||{}).value || '';
+  if (d) d.value = _ccDate  || (document.getElementById('ccDate')||{}).value || '';
+  if (m) m.value = _ccMb52Date || (document.getElementById('ccMb52Date')||{}).value || '';
+  if (w) w.style.display = 'none';
+  var modal = document.getElementById('ccSaveModal');
+  if (modal) { modal.style.display = 'flex'; }
+}
+
+function ccCloseSaveModal() {
+  var modal = document.getElementById('ccSaveModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function ccConfirmSave() {
+  var round    = (document.getElementById('ccSaveRound')   ||{}).value.trim();
+  var dateVal  = (document.getElementById('ccSaveDate')    ||{}).value.trim();
+  var mb52Date = (document.getElementById('ccSaveMb52Date')||{}).value.trim();
+  var warnEl   = document.getElementById('ccSaveModalWarn');
+
+  if (!round || !dateVal || !mb52Date) {
+    if (warnEl) { warnEl.style.display=''; warnEl.textContent='⚠ กรุณากรอกข้อมูลให้ครบทั้ง 3 ช่อง'; }
+    return;
+  }
+
+  // อัปเดต global vars
+  _ccRound    = round;
+  _ccDate     = dateVal;
+  _ccMb52Date = mb52Date;
+
+  ccCloseSaveModal();
+
+  // บันทึกจริง
   var STAT_SHEET = 'CONCRETE_STAT';
   var now = new Date().toLocaleString('th-TH');
 
@@ -8568,5 +8609,39 @@ async function ccLoadSelectedRound() {
 }
 
 </script>
+  <!-- ══ Modal: กรอกข้อมูลก่อนบันทึกสถิติ ══ -->
+  <div id="ccSaveModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:28px;width:min(520px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.4)">
+      <div style="font-size:1rem;font-weight:700;color:var(--text);margin-bottom:4px">💾 บันทึกสถิติการตรวจนับ</div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:20px">กรุณาตรวจสอบและกรอกข้อมูลให้ครบก่อนบันทึก</div>
+
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <div style="font-size:.72rem;color:var(--muted);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">ชื่อรอบตรวจนับ <span style="color:var(--accent2)">*</span></div>
+          <input type="text" id="ccSaveRound" placeholder="เช่น ตรวจนับผลิตภัณฑ์คอนกรีต ประจำเดือน มีนาคม 2569"
+            style="width:100%;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:.88rem;outline:none;box-sizing:border-box">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <div style="font-size:.72rem;color:var(--muted);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">ช่วงวันที่ตรวจนับ <span style="color:var(--accent2)">*</span></div>
+            <input type="text" id="ccSaveDate" placeholder="เช่น 16 มี.ค. 2569 - 18 มี.ค. 2569"
+              style="width:100%;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:.88rem;outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:.72rem;color:var(--muted);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">วันที่อ้างอิงข้อมูล MB52 <span style="color:var(--accent2)">*</span></div>
+            <input type="text" id="ccSaveMb52Date" placeholder="เช่น 15 มี.ค. 2569"
+              style="width:100%;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:.88rem;outline:none;box-sizing:border-box">
+          </div>
+        </div>
+        <div id="ccSaveModalWarn" style="display:none;font-size:.78rem;color:var(--accent2);padding:8px 12px;border-radius:8px;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.3)"></div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:22px;justify-content:flex-end">
+        <button onclick="ccCloseSaveModal()" style="padding:9px 22px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Sarabun',sans-serif;font-size:.88rem">ยกเลิก</button>
+        <button onclick="ccConfirmSave()" style="padding:9px 26px;border-radius:10px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-family:'Sarabun',sans-serif;font-size:.88rem;font-weight:700">✅ อนุมัติ บันทึกสถิติ</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
