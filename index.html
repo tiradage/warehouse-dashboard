@@ -2709,7 +2709,8 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
                 <th style="text-align:center">สถานะ</th>
                 <th style="text-align:right">ผลต่าง (รวม)</th>
                 <th>Sub-location</th>
-                <th>หมายเหตุ</th>
+                <th>หมายเหตุ (กอง)</th>
+                <th>หมายเหตุ (รวมทุกกอง)</th>
               </tr>
             </thead>
             <tbody id="ccResultBody"></tbody>
@@ -8013,7 +8014,8 @@ function ccExportExcel() {
     });
     var totalCntC  = ci;
     var totalDiffC = ci + 1;
-    var totalCols  = ci + 2;
+    var totalNoteC = ci + 2;   // หมายเหตุรวมทุกกอง
+    var totalCols  = ci + 3;
 
     // Header rows
     var hdr1 = new Array(totalCols).fill('');
@@ -8033,6 +8035,7 @@ function ccExportExcel() {
     hdr2[totalCntC]  = 'สรุปรวม';
     hdr3[totalCntC]  = 'รวมนับ(ทั้งหมด)';
     hdr3[totalDiffC] = 'ผลต่าง(นับ-SAP)';
+    hdr3[totalNoteC] = 'หมายเหตุ(รวมทุกกอง)';
 
     var sheetData = [hdr1, hdr2, hdr3];
     codes.forEach(function(c, dataIdx) {
@@ -8084,6 +8087,9 @@ function ccExportExcel() {
       var totalCntCell = XLSX.utils.encode_cell({r:rowIdx, c:totalCntC});
       var sapTotalCell = XLSX.utils.encode_cell({r:rowIdx, c:3});
       row[totalDiffC] = {f: totalCntCell + '-' + sapTotalCell};
+      // หมายเหตุรวมทุกกอง — กรอกเอง (pre-fill จากรอบก่อน ถ้าเลือก)
+      var noteKey = c.code + '||__total__note__';
+      row[totalNoteC] = prefill[noteKey] || '';
 
       sheetData.push(row);
     });
@@ -8097,7 +8103,7 @@ function ccExportExcel() {
       loc.subCols.forEach(function(){ wscols.push({wch:10}); });
       wscols.push({wch:10},{wch:10},{wch:22});
     });
-    wscols.push({wch:10},{wch:11});
+    wscols.push({wch:10},{wch:11},{wch:40});
     ws['!cols'] = wscols;
 
     XLSX.utils.book_append_sheet(wb, ws, 'แบทช' + batch);
@@ -8276,12 +8282,14 @@ function ccHandleUpload(event) {
           var locNote = {}; // locId -> note
           var locSubs = {}; // locId -> {subName: val}
 
+          var noteTotal = '';
           colMap.forEach(function(cm) {
             var val = parseFloat(row[cm.ci]) || 0;
             var s   = String(row[cm.ci]||'').trim();
-            if (cm.type==='sap')  { locSap[cm.locId]  = val; }
-            if (cm.type==='cnt')  { locCnt[cm.locId]  = val; }
-            if (cm.type==='note') { locNote[cm.locId] = s; }
+            if (cm.type==='sap')       { locSap[cm.locId]  = val; }
+            if (cm.type==='cnt')       { locCnt[cm.locId]  = val; }
+            if (cm.type==='note')      { locNote[cm.locId] = s; }
+            if (cm.type==='totalNote') { noteTotal = s; }
             if (cm.type==='sub')  {
               if (!locSubs[cm.locId]) locSubs[cm.locId]={};
               locSubs[cm.locId][cm.subName] = val;
@@ -8306,7 +8314,8 @@ function ccHandleUpload(event) {
               diff: counted - sapLoc,
               diffTotal: 0, // คำนวณทีหลัง
               subs: locSubs[loc.id] || {},
-              note: locNote[loc.id] || ''
+              note: locNote[loc.id] || '',
+              noteTotal: noteTotal
             });
           });
 
@@ -8383,7 +8392,7 @@ function ccRenderResult() {
   var tbody = document.getElementById('ccResultBody');
   if (!tbody) return;
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--muted)">ไม่พบรายการ</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--muted)">ไม่พบรายการ</td></tr>';
     return;
   }
 
@@ -8420,7 +8429,8 @@ function ccRenderResult() {
       '<td style="text-align:center">' + badgeLoc + '</td>' +
       '<td class="mono" style="text-align:right;font-size:.78rem;' + dcTotal + '">' + (dTotal>0?'+':'') + dTotal.toLocaleString() + '</td>' +
       '<td style="font-size:.72rem;color:var(--muted);max-width:120px">' + (subHtml||'—') + '</td>' +
-      '<td style="font-size:.75rem;color:var(--muted)">' + _esc(r.note||'–') + '</td>' +
+      '<td style="font-size:.75rem;color:var(--muted);max-width:140px;white-space:pre-wrap">' + _esc(r.note||'–') + '</td>' +
+      '<td style="font-size:.75rem;color:var(--muted);max-width:160px;white-space:pre-wrap">' + _esc(r.noteTotal||'–') + '</td>' +
       '</tr>';
   }).join('');
 }
