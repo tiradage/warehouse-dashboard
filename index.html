@@ -7788,12 +7788,12 @@ var _ccMb52Date = '';
 // ── Default กองหมอน ────────────────────────────────────────────
 var CC_DEFAULT_LOCS = [
   {id:'6002', name:'กฟส.เขาพนม',        subs:'กฟส.ขพ.'},
-  {id:'6003', name:'กฟจ.กระบี่',         subs:'หน้าชิง, สถานีกระบี่, ใต้ไลน์, อ่าวบาง'},
+  {id:'6003', name:'กฟจ.กระบี่',         subs:'หน้าชิง, สถานีกระบี่, ใต้ไลน์, อ่าวนาง'},
   {id:'6004', name:'กฟส.คลองท่อม',       subs:'กฟส.คท., ลำทับ'},
-  {id:'6005', name:'กฟจ.กระบี่(115KV)',  subs:'สถานีกระบี่'},
+  {id:'6005', name:'กฟจ.กระบี่(115KV)',  subs:'สามแยกในสระ, สถานีกระบี่, ใต้ไลน์'},
   {id:'6006', name:'กฟส.อ่าวลึก',        subs:'กฟส.อล., สถานีอ่าวลึก, วังจา'},
   {id:'6008', name:'กฟส.เกาะลันตา',      subs:'หัวสะพานบนเกาะ, ศูนย์กีฬาทางทะเล, ศูนย์พัฒนาเด็กเล็ก'},
-  {id:'6009', name:'กฟส.เหนือคลอง',      subs:'กฟส.หคง., ห้วยมัด+อบต., ห้วยคราม'},
+  {id:'6009', name:'กฟส.เหนือคลอง',      subs:'กฟส.หคง., ห้วยคราม, ห้วยมัด+อบต.'},
 ];
 
 // ── Keywords คอนกรีต ──────────────────────────────────────────
@@ -8517,6 +8517,7 @@ function _ccGeneratePDF(rows, title, isSummary) {
           Object.entries(r.subs).filter(function(e){return e[1]>0;})
             .map(function(e){return e[0]+':'+e[1];}).join(', ') + '</span>';
       }
+      var noteTotalPdf = r.noteTotal ? '<div style="font-size:9px;color:#92400e;margin-top:3px;white-space:pre-wrap;border-top:1px solid #fde68a;padding-top:2px">' + r.noteTotal + '</div>' : '';
       tblRows += '<tr style="border-bottom:1px solid #e5e7eb">' +
         '<td style="padding:5px 8px;font-size:10px">' + (i+1) + '</td>' +
         '<td style="padding:5px 8px;font-family:monospace;font-size:10px">' + r.code + '</td>' +
@@ -8525,7 +8526,7 @@ function _ccGeneratePDF(rows, title, isSummary) {
         '<td style="padding:5px 8px;text-align:right;font-size:10px">' + (r.sapStock||0).toLocaleString() + '</td>' +
         '<td style="padding:5px 8px;text-align:right;font-size:10px;font-weight:700;color:#1d4ed8">' + (r.counted||0).toLocaleString() + '</td>' +
         '<td style="padding:5px 8px;text-align:right;font-size:10px;' + dc + '">' + (r.diff>0?'+':'') + (r.diff||0).toLocaleString() + '</td>' +
-        '<td style="padding:5px 8px;font-size:9px;color:#6b7280">' + (r.note||'') + '</td>' +
+        '<td style="padding:5px 8px;font-size:9px;color:#6b7280">' + (r.note||'') + noteTotalPdf + '</td>' +
         '</tr>';
       gTotal.sap += r.sapStock||0; gTotal.counted += r.counted||0; gTotal.diff += r.diff||0;
     });
