@@ -2604,12 +2604,19 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
         <div style="font-size:.72rem;color:var(--muted);margin-top:8px">💡 Sub-location คั่นด้วยเครื่องหมายจุลภาค เช่น หน้าชิง, สถานี, ใต้ไลน์</div>
       </div>
 
-      <!-- Preview codes -->
+      <!-- Preview codes hidden -->
+      <div id="ccCodePreview" style="display:none"></div>
+
+      <!-- ดึงข้อมูลรอบก่อนหน้า -->
       <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px">
-        <div style="font-size:.76rem;font-weight:600;color:var(--muted);margin-bottom:10px">รหัสพัสดุคอนกรีตที่พบใน MB52 (batch N)</div>
-        <div id="ccCodePreview" style="display:flex;flex-wrap:wrap;gap:6px;min-height:36px">
-          <span style="color:var(--muted);font-size:.78rem">กำลังโหลด...</span>
+        <div style="font-size:.76rem;font-weight:600;color:var(--text);margin-bottom:8px">📋 ดึงข้อมูลรอบก่อนหน้า (ยอดนับ + หมายเหตุ)</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="ccPrefillRound" style="flex:1;min-width:200px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:.82rem;outline:none">
+            <option value="">— ไม่ดึงข้อมูลเก่า (เริ่มใหม่) —</option>
+          </select>
+          <button onclick="ccLoadPrefillRounds()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;font-family:'Sarabun',sans-serif;font-size:.8rem;white-space:nowrap">🔄 โหลดรายการรอบ</button>
         </div>
+        <div style="font-size:.7rem;color:var(--muted);margin-top:6px">ถ้าเลือกรอบ → ยอดนับและหมายเหตุของรอบนั้นจะถูก pre-fill ลงไฟล์ Excel เพื่อให้แก้ไขต่อได้</div>
       </div>
 
       <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -2672,9 +2679,14 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
           <option value="hi">🟡 เกิน</option>
         </select>
         <div style="margin-left:auto;display:flex;gap:8px">
-          <button onclick="ccPrintPDF()" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;border:1px solid rgba(96,165,250,.4);background:rgba(96,165,250,.1);color:var(--blue);cursor:pointer;font-family:'Sarabun',sans-serif;font-size:.82rem;font-weight:600">
-            🖨️ พิมพ์ PDF
-          </button>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="ccPdfLocSel" style="background:var(--surface2);border:1.5px solid var(--border);color:var(--text);padding:7px 10px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:.8rem;outline:none">
+              <option value="">📄 PDF รวมทุกกอง</option>
+            </select>
+            <button onclick="ccPrintPDF()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;border:1px solid rgba(96,165,250,.4);background:rgba(96,165,250,.1);color:var(--blue);cursor:pointer;font-family:'Sarabun',sans-serif;font-size:.82rem;font-weight:600;white-space:nowrap">
+              🖨️ พิมพ์ PDF
+            </button>
+          </div>
           <button onclick="ccSaveStat()" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;border:1px solid rgba(79,255,176,.4);background:rgba(79,255,176,.08);color:var(--accent);cursor:pointer;font-family:'Sarabun',sans-serif;font-size:.82rem;font-weight:600">
             💾 บันทึกสถิติ
           </button>
@@ -7774,13 +7786,13 @@ var _ccMb52Date = '';
 
 // ── Default กองหมอน ────────────────────────────────────────────
 var CC_DEFAULT_LOCS = [
-  {id:'6002', name:'กฟส.เขาพนม',        subs:'หน้าชิง, สถานี'},
-  {id:'6003', name:'กฟจ.กระบี่',         subs:'หน้าชิง, สถานี, ใต้ไลน์'},
-  {id:'6004', name:'กฟส.คลองท่อม',       subs:'หน้าชิง, สถานี'},
-  {id:'6005', name:'กฟจ.กระบี่(115KV)',  subs:'สถานี'},
-  {id:'6006', name:'กฟส.อ่าวลึก',        subs:'กฟส.อล., สถานี, วังจา, ซอยปากน้ำ'},
-  {id:'6008', name:'กฟส.เกาะลันตา',      subs:'หน้าชิง, สถานี'},
-  {id:'6009', name:'กฟส.เหนือคลอง',      subs:'หน้าชิง, สถานี'},
+  {id:'6002', name:'กฟส.เขาพนม',        subs:'กฟส.ขพ.'},
+  {id:'6003', name:'กฟจ.กระบี่',         subs:'หน้าชิง, สถานีกระบี่, ใต้ไลน์, อ่าวบาง'},
+  {id:'6004', name:'กฟส.คลองท่อม',       subs:'กฟส.คท., ลำทับ'},
+  {id:'6005', name:'กฟจ.กระบี่(115KV)',  subs:'สถานีกระบี่'},
+  {id:'6006', name:'กฟส.อ่าวลึก',        subs:'กฟส.อล., สถานีอ่าวลึก, วังจา'},
+  {id:'6008', name:'กฟส.เกาะลันตา',      subs:'หัวสะพานบนเกาะ, ศูนย์กีฬาทางทะเล, ศูนย์พัฒนาเด็กเล็ก'},
+  {id:'6009', name:'กฟส.เหนือคลอง',      subs:'กฟส.หคง., ห้วยมัด+อบต., ห้วยคราม'},
 ];
 
 // ── Keywords คอนกรีต ──────────────────────────────────────────
@@ -7941,145 +7953,219 @@ function _esc(s) {
 function ccExportExcel() {
   if (!window.XLSX) { showToast('XLSX library ยังโหลดไม่เสร็จ', true); return; }
 
-  var round     = (document.getElementById('ccRound')    || {}).value || ('รอบ ' + new Date().toLocaleDateString('th-TH'));
-  var dateVal   = (document.getElementById('ccDate')     || {}).value || '';
-  var mb52Date  = (document.getElementById('ccMb52Date') || {}).value || '';
-  _ccRound   = round;
-  _ccDate    = dateVal;
-  _ccMb52Date = mb52Date;
+  var round    = (document.getElementById('ccRound')    ||{}).value || ('รอบ ' + new Date().toLocaleDateString('th-TH'));
+  var dateVal  = (document.getElementById('ccDate')     ||{}).value || '';
+  var mb52Date = (document.getElementById('ccMb52Date') ||{}).value || '';
+  _ccRound = round; _ccDate = dateVal; _ccMb52Date = mb52Date;
 
   _ccLoadConcreteCodesFromInvData();
   if (_ccCodes.length === 0) { showToast('ไม่พบรหัสคอนกรีตใน MB52 กรุณาโหลดข้อมูลก่อน', true); return; }
 
-  var validLocs = _ccLocs.filter(function(l) { return l.id && l.name; });
+  var validLocs = _ccLocs.filter(function(l){ return l.id && l.name; });
   if (validLocs.length === 0) { showToast('กรุณาเพิ่มกองหมอนอย่างน้อย 1 กอง', true); return; }
+
+  // ── ดึงข้อมูล pre-fill จากรอบที่เลือก ──
+  var prefillSel = document.getElementById('ccPrefillRound');
+  var prefillRound = prefillSel ? prefillSel.value : '';
+  // _ccPrefillData = {code+'||'+wh+'||'+sub -> cnt, code+'||'+wh -> note}
+  var prefill = _ccPrefillData || {};
 
   var wb = XLSX.utils.book_new();
 
-  // ── Sheet คู่มือ ──
+  // Sheet คู่มือ
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
     ['ระบบตรวจนับผลิตภัณฑ์คอนกรีต — กฟภ.กระบี่'],
-    ['รอบตรวจนับ:', round], ['วันที่:', dateVal], [''],
-    ['วิธีใช้:'],
-    ['1. กรอกยอดนับจริงในคอลัม "นับรวม(กอง)" และ sub-location (ถ้ามี)'],
-    ['2. คอลัม SAP และ ผลต่าง ระบบคำนวณให้อัตโนมัติเมื่อ Upload'],
-    ['3. กรอกหมายเหตุ (ถ้ามี) ในคอลัมหมายเหตุของแต่ละกอง'],
-    ['4. บันทึกไฟล์แล้วอัปโหลดกลับใน Dashboard ขั้นตอน 2'],
-    [''],['หมายเหตุ: ห้ามแก้ไข row 1-3 (header) และ col A-D'],
+    ['รอบตรวจนับ:', round], ['ช่วงวันที่ตรวจนับ:', dateVal], ['วันที่อ้างอิง MB52:', mb52Date],
+    [''], ['วิธีใช้:'],
+    ['1. กรอกยอดนับจริงในคอลัม sub-location (ช่องสีน้ำเงิน)'],
+    ['2. คอลัม "นับรวม(กอง)" และ "ผลต่าง" มีสูตรคำนวณอัตโนมัติ ห้ามแก้ไข'],
+    ['3. กรอกหมายเหตุ (ถ้ามี) ในคอลัมสุดท้ายของแต่ละกอง'],
+    ['4. บันทึกแล้วอัปโหลดกลับใน Dashboard ขั้นตอน 2'],
+    [''], ['⚠ ห้ามแก้ไข row 1-3 (header) และ col A-D'],
+    prefillRound ? ['📋 ข้อมูล pre-fill จากรอบ: ' + prefillRound] : [''],
   ]), 'คู่มือ');
 
-  // ── สร้าง sheet แต่ละ batch ──
-  // โครงสร้าง: row1=title, row2=group header, row3=detail header, row4+=data
-  // per loc cols: SAP(กอง) | นับรวม(กอง) | ผลต่าง(กอง) | sub1 | sub2 | ... | หมายเหตุ
-  // สุดท้าย: รวมนับ | ผลต่างรวม
+  var locSubMap = validLocs.map(function(loc) {
+    var subs = loc.subs ? loc.subs.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
+    return {id:loc.id, name:loc.name, subs:subs};
+  });
 
   var batches = ['N','R'];
   batches.forEach(function(batch) {
     var codes = _ccCodes.filter(function(c){ return c.batch === batch; });
     if (!codes.length) return;
 
-    // หา sub-location ของแต่ละกอง จาก _ccLocs
-    var locSubMap = validLocs.map(function(loc) {
-      var subs = loc.subs ? loc.subs.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
-      return { id: loc.id, name: loc.name, subs: subs };
-    });
-
-    // คำนวณ col index
-    // fixed: col0=รหัส,1=ชื่อ,2=หน่วย,3=SAP รวม
-    // per loc: SAP(กอง), นับรวม(กอง), ผลต่าง(กอง), sub1..., หมายเหตุ
-    // last: รวมนับ, ผลต่างรวม
+    // คำนวณ col structure
+    // fixed: 0=รหัส,1=ชื่อ,2=หน่วย,3=SAP รวม
+    // per loc: [SAP(กอง), sub1, sub2, ..., นับรวม(กอง), ผลต่าง(กอง), หมายเหตุ]
+    // last: รวมนับทั้งหมด, ผลต่างรวม
     var locColMap = [];
-    var colIdx = 4;
+    var ci = 4;
     locSubMap.forEach(function(loc) {
-      locColMap.push({
-        id: loc.id, name: loc.name, subs: loc.subs,
-        sapCol: colIdx, cntCol: colIdx+1, diffCol: colIdx+2,
-        subCols: loc.subs.map(function(s,i){ return {name:s, col:colIdx+3+i}; }),
-        noteCol: colIdx+3+loc.subs.length
-      });
-      colIdx += 4 + loc.subs.length;
+      var sapC = ci;
+      var subCols = loc.subs.map(function(s,i){ return {name:s, col:ci+1+i}; });
+      var cntC = ci + 1 + loc.subs.length;
+      var diffC = cntC + 1;
+      var noteC = diffC + 1;
+      locColMap.push({id:loc.id, name:loc.name, subs:loc.subs,
+        sapC:sapC, subCols:subCols, cntC:cntC, diffC:diffC, noteC:noteC});
+      ci = noteC + 1;
     });
-    var totalCntCol  = colIdx;
-    var totalDiffCol = colIdx + 1;
-    var totalCols    = colIdx + 2;
+    var totalCntC  = ci;
+    var totalDiffC = ci + 1;
+    var totalCols  = ci + 2;
 
-    // สร้าง header rows
-    var hdr1 = new Array(totalCols).fill(''); // row1: title
-    var hdr2 = new Array(totalCols).fill(''); // row2: รหัส/ชื่อ/หน่วย/SAP + group per loc
-    var hdr3 = new Array(totalCols).fill(''); // row3: detail
-
+    // Header rows
+    var hdr1 = new Array(totalCols).fill('');
+    var hdr2 = new Array(totalCols).fill('');
+    var hdr3 = new Array(totalCols).fill('');
     hdr1[0] = 'ตรวจนับคอนกรีต แบทช์ ' + batch + ' — ' + round + ' | ' + dateVal;
     hdr2[0]='รหัสพัสดุ'; hdr2[1]='ชื่อพัสดุ'; hdr2[2]='หน่วย'; hdr2[3]='SAP(รวม)';
     hdr3[0]='รหัสพัสดุ'; hdr3[1]='ชื่อพัสดุ'; hdr3[2]='หน่วย'; hdr3[3]='SAP(รวม)';
-
     locColMap.forEach(function(loc) {
-      hdr2[loc.sapCol] = loc.id + ' ' + loc.name; // group label
-      hdr3[loc.sapCol]  = 'SAP(กอง)';
-      hdr3[loc.cntCol]  = 'นับรวม(กอง)';
-      hdr3[loc.diffCol] = 'ผลต่าง(กอง)';
+      hdr2[loc.sapC] = loc.id + ' ' + loc.name;
+      hdr3[loc.sapC] = 'SAP(กอง)';
       loc.subCols.forEach(function(sc){ hdr3[sc.col] = sc.name; });
-      hdr3[loc.noteCol] = 'หมายเหตุ';
+      hdr3[loc.cntC]  = 'นับรวม(กอง)';
+      hdr3[loc.diffC] = 'ผลต่าง(กอง)';
+      hdr3[loc.noteC] = 'หมายเหตุ';
     });
-    hdr2[totalCntCol]  = 'สรุปรวม';
-    hdr3[totalCntCol]  = 'รวมนับ(ทั้งหมด)';
-    hdr3[totalDiffCol] = 'ผลต่าง(นับ-SAP)';
+    hdr2[totalCntC]  = 'สรุปรวม';
+    hdr3[totalCntC]  = 'รวมนับ(ทั้งหมด)';
+    hdr3[totalDiffC] = 'ผลต่าง(นับ-SAP)';
 
-    // data rows
-    var dataRows = codes.map(function(c) {
-      var row = new Array(totalCols).fill(0);
-      row[0] = c.code; row[1] = c.name; row[2] = c.unit || 'EA'; row[3] = c.sapStock;
-      // กรอก SAP per กอง จาก whStock
+    var sheetData = [hdr1, hdr2, hdr3];
+    codes.forEach(function(c, dataIdx) {
+      var rowIdx = dataIdx + 3; // 0-indexed: row0=hdr1,row1=hdr2,row2=hdr3
+      var xlRow  = rowIdx + 1;  // Excel 1-indexed
+      var row = new Array(totalCols).fill('');
+      row[0] = c.code; row[1] = c.name; row[2] = c.unit || 'EA';
+      row[3] = c.sapStock;
+
+      // per loc
+      var locCntCells = [];
       locColMap.forEach(function(loc) {
         var sapLoc = (c.whStock && c.whStock[loc.id]) ? (parseFloat(c.whStock[loc.id])||0) : 0;
-        row[loc.sapCol]  = sapLoc;
-        row[loc.cntCol]  = 0; // ช่องกรอก
-        row[loc.diffCol] = 0; // คำนวณตอน upload
-        loc.subCols.forEach(function(sc){ row[sc.col] = 0; }); // ช่องกรอก sub
-        row[loc.noteCol] = '';
+        row[loc.sapC] = sapLoc;
+
+        // sub cols — pre-fill จากรอบก่อน
+        loc.subCols.forEach(function(sc) {
+          var pKey = c.code + '||' + loc.id + '||' + sc.name;
+          row[sc.col] = prefill[pKey] || 0;
+        });
+
+        // นับรวม(กอง) = SUM(sub cols) — สูตร Excel
+        var subLetters = loc.subCols.map(function(sc){
+          return XLSX.utils.encode_cell({r:rowIdx, c:sc.col});
+        });
+        var sumFormula = subLetters.length > 0
+          ? subLetters.join('+')
+          : '0';
+        var cntCell = XLSX.utils.encode_cell({r:rowIdx, c:loc.cntC});
+        locCntCells.push(cntCell);
+        row[loc.cntC]  = {f: sumFormula};
+
+        // ผลต่าง(กอง) = นับรวม(กอง) - SAP(กอง)
+        var sapCell = XLSX.utils.encode_cell({r:rowIdx, c:loc.sapC});
+        row[loc.diffC] = {f: cntCell + '-' + sapCell};
+
+        // หมายเหตุ — pre-fill
+        var nKey = c.code + '||' + loc.id + '||note';
+        row[loc.noteC] = prefill[nKey] || '';
       });
-      row[totalCntCol]  = 0;
-      row[totalDiffCol] = 0;
-      return row;
+
+      // รวมนับทั้งหมด = SUM(นับรวม ทุกกอง)
+      var totalFormula = locCntCells.length > 0 ? locCntCells.join('+') : '0';
+      row[totalCntC]  = {f: totalFormula};
+      // ผลต่างรวม = รวมนับ - SAP รวม
+      var totalCntCell = XLSX.utils.encode_cell({r:rowIdx, c:totalCntC});
+      var sapTotalCell = XLSX.utils.encode_cell({r:rowIdx, c:3});
+      row[totalDiffC] = {f: totalCntCell + '-' + sapTotalCell};
+
+      sheetData.push(row);
     });
 
-    var sheetData = [hdr1, hdr2, hdr3].concat(dataRows);
     var ws = XLSX.utils.aoa_to_sheet(sheetData);
     ws['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:sheetData.length-1, c:totalCols-1}});
 
-    // col widths
     var wscols = [{wch:14},{wch:34},{wch:7},{wch:10}];
     locColMap.forEach(function(loc) {
-      wscols.push({wch:9},{wch:10},{wch:9}); // sap,cnt,diff
+      wscols.push({wch:9});
       loc.subCols.forEach(function(){ wscols.push({wch:10}); });
-      wscols.push({wch:22}); // note
+      wscols.push({wch:10},{wch:10},{wch:22});
     });
-    wscols.push({wch:10},{wch:10}); // total
+    wscols.push({wch:10},{wch:11});
     ws['!cols'] = wscols;
 
     XLSX.utils.book_append_sheet(wb, ws, 'แบทช' + batch);
   });
 
-  // ── META ──
+  // META
   var metaLocs = _ccLocs.map(function(l){ return l.id+'|'+l.name+'|'+(l.subs||''); }).join(';;');
-  var codesN = _ccCodes.filter(function(c){return c.batch==='N';})
-    .map(function(c){return c.code+','+c.sapStock;}).join(';');
-  var codesR = _ccCodes.filter(function(c){return c.batch==='R';})
-    .map(function(c){return c.code+','+c.sapStock;}).join(';');
-
+  var codesN = _ccCodes.filter(function(c){return c.batch==='N';}).map(function(c){return c.code+','+c.sapStock;}).join(';');
+  var codesR = _ccCodes.filter(function(c){return c.batch==='R';}).map(function(c){return c.code+','+c.sapStock;}).join(';');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
     ['__CONCRETE_COUNT_META__','1'],
-    ['round', round], ['date', dateVal], ['mb52date', mb52Date],
-    ['locs', metaLocs], ['codesN', codesN], ['codesR', codesR],
+    ['round',round],['date',dateVal],['mb52date',mb52Date],
+    ['locs',metaLocs],['codesN',codesN],['codesR',codesR],
   ]), '__META__');
 
   try {
     var d = new Date();
-    var fname = 'ตรวจนับคอนกรีต_' + d.getFullYear() +
-      String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + '.xlsx';
+    var fname = 'ตรวจนับคอนกรีต_' + d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + '.xlsx';
     XLSX.writeFile(wb, fname);
-    showToast('Export สำเร็จ ' + _ccCodes.length + ' รายการ ✓');
+    showToast('Export สำเร็จ ' + _ccCodes.length + ' รายการ ✓ ' + (prefillRound ? '(pre-fill จาก '+prefillRound+')' : ''));
     ccGoStep(2);
   } catch(err) { showToast('Export ไม่สำเร็จ: ' + err.message, true); }
+}
+
+// ── โหลดรายการรอบสำหรับ pre-fill dropdown ──
+var _ccPrefillData = {}; // {code||wh||sub -> cnt, code||wh||note -> note}
+
+async function ccLoadPrefillRounds() {
+  var selEl = document.getElementById('ccPrefillRound');
+  if (!selEl) return;
+  try {
+    var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_NAME_ID +
+      '/values/' + encodeURIComponent('CONCRETE_STAT') + '?key=' + API_KEY;
+    var res = await fetch(url);
+    if (!res.ok) { showToast('โหลดรายการรอบไม่สำเร็จ', true); return; }
+    var data = await res.json();
+    var rows = (data.values || []).slice(1);
+    var roundMap = {};
+    rows.forEach(function(r){
+      var key = r[0]||'';
+      if (!key) return;
+      if (!roundMap[key]) roundMap[key] = {round:r[0]||'', dateRange:r[1]||'', count:0};
+      roundMap[key].count++;
+    });
+    var rounds = Object.values(roundMap).sort(function(a,b){return b.round.localeCompare(a.round);});
+    selEl.innerHTML = '<option value="">— ไม่ดึงข้อมูลเก่า (เริ่มใหม่) —</option>';
+    rounds.forEach(function(rd) {
+      var opt = document.createElement('option');
+      opt.value = rd.round;
+      opt.textContent = rd.round + (rd.dateRange ? ' | '+rd.dateRange : '') + ' ('+rd.count+' รายการ)';
+      selEl.appendChild(opt);
+    });
+    // เก็บ raw data สำหรับ pre-fill
+    selEl.onchange = function() {
+      var sel = selEl.value;
+      _ccPrefillData = {};
+      if (!sel) return;
+      rows.filter(function(r){return r[0]===sel;}).forEach(function(r){
+        // col: [0]รอบ [1]ช่วงวันที่ [2]MB52 [3]batch [4]code [5]name [6]wh [7]whName [8]SAP(กอง) [9]นับ(กอง) [10]ผลต่าง [11]SAP(รวม) [12]นับ(รวม) [13]ผลต่าง(รวม) [14]note
+        var code = r[4]||''; var wh = r[6]||''; var note = r[14]||'';
+        // เก็บ note
+        _ccPrefillData[code+'||'+wh+'||note'] = note;
+        // ยอดนับรวม (ไม่มี sub breakdown ใน sheet — ใส่ทั้งหมดไว้ที่ sub แรก)
+        // จะ pre-fill ใน sub col แรกของกองนั้น
+        var cnt = parseFloat(r[9])||0;
+        _ccPrefillData[code+'||'+wh+'||__total__'] = cnt;
+      });
+      showToast('เลือกรอบ ' + sel + ' สำหรับ pre-fill ✓');
+    };
+    showToast('โหลด ' + rounds.length + ' รอบ ✓');
+  } catch(e) { showToast('โหลดไม่สำเร็จ: ' + e.message, true); }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -8250,6 +8336,7 @@ function ccHandleUpload(event) {
       statusEl.textContent='✅ อ่านไฟล์สำเร็จ '+_ccResult.length+' รายการ';
       showToast('อ่านไฟล์สำเร็จ ✓');
       ccGoStep(3);
+      _ccPopulatePdfLocs();
     } catch(err) {
       statusEl.style.background='rgba(255,107,107,.1)';
       statusEl.style.color='var(--accent2)';
@@ -8341,85 +8428,137 @@ function ccRenderResult() {
 function ccPrintPDF() {
   if (!_ccResult.length) { showToast('ไม่มีข้อมูล กรุณา Upload ก่อน', true); return; }
 
-  var dateStr = _ccDate ? (function(){
-    var p = _ccDate.split('-');
-    return p[2]+'/'+p[1]+'/'+(parseInt(p[0])+543);
-  })() : new Date().toLocaleDateString('th-TH');
+  var locSel   = document.getElementById('ccPdfLocSel');
+  var selLocId = locSel ? locSel.value : '';
+  var batchF   = (document.getElementById('ccBatchToggle')||{}).value || '';
 
-  var batchF = (document.getElementById('ccBatchToggle')||{}).value || '';
-  var rows = _ccResult.filter(function(r){return !batchF || r.batch===batchF;});
+  // filter rows
+  var allRows = _ccResult.filter(function(r){ return !batchF || r.batch === batchF; });
 
-  // Group by batch then by code
-  var byBatch = {};
-  rows.forEach(function(r) {
-    if (!byBatch[r.batch]) byBatch[r.batch] = {};
-    var key = r.code + '||' + (r.wh||'');
-    byBatch[r.batch][key] = r;
+  if (selLocId) {
+    // พิมพ์เฉพาะกองที่เลือก
+    var locName = '';
+    allRows.forEach(function(r){ if(r.wh===selLocId) locName=r.whName; });
+    _ccGeneratePDF(allRows.filter(function(r){ return r.wh === selLocId; }),
+      selLocId + ' ' + locName, false);
+  } else {
+    // พิมพ์สรุปรวมทุกกอง (groupby code+batch, sum counted)
+    _ccGeneratePDF(allRows, 'ทุกกองหมอน', true);
+  }
+}
+
+// populate PDF loc selector เมื่อมีผลลัพธ์
+function _ccPopulatePdfLocs() {
+  var sel = document.getElementById('ccPdfLocSel');
+  if (!sel || !_ccResult.length) return;
+  var locSet = {};
+  _ccResult.forEach(function(r){ if(r.wh) locSet[r.wh] = r.whName; });
+  sel.innerHTML = '<option value="">📄 PDF รวมทุกกอง</option>';
+  Object.keys(locSet).sort().forEach(function(id){
+    var opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = '📄 PDF กอง ' + id + ' ' + locSet[id];
+    sel.appendChild(opt);
   });
+}
 
+function _ccGeneratePDF(rows, title, isSummary) {
   var tblRows = '';
   var gTotal = {sap:0, counted:0, diff:0};
-  rows.forEach(function(r, i) {
-    var dc = r.diff < 0 ? 'color:#dc2626;font-weight:700' : r.diff > 0 ? 'color:#d97706;font-weight:700' : 'color:#059669';
-    tblRows += '<tr style="border-bottom:1px solid #e5e7eb">' +
-      '<td style="padding:5px 8px;font-family:monospace;font-size:11px">' + (i+1) + '</td>' +
-      '<td style="padding:5px 8px;font-family:monospace;font-size:11px">' + r.code + '</td>' +
-      '<td style="padding:5px 8px;font-size:11px">' + (r.name||'') + '</td>' +
-      '<td style="padding:5px 8px;font-size:11px;text-align:center">' + r.batch + '</td>' +
-      '<td style="padding:5px 8px;font-size:11px;text-align:center">' + (r.wh||'–') + ' ' + (r.whName||'') + '</td>' +
-      '<td style="padding:5px 8px;text-align:right;font-size:11px">' + (r.sapStock||0).toLocaleString() + '</td>' +
-      '<td style="padding:5px 8px;text-align:right;font-size:11px;font-weight:700;color:#1d4ed8">' + (r.counted||0).toLocaleString() + '</td>' +
-      '<td style="padding:5px 8px;text-align:right;font-size:11px;' + dc + '">' + (r.diff>0?'+':'') + r.diff.toLocaleString() + '</td>' +
-      '<td style="padding:5px 8px;font-size:10px;color:#6b7280">' + (r.note||'') + '</td>' +
-      '</tr>';
-    gTotal.sap += r.sapStock || 0;
-    gTotal.counted += r.counted || 0;
-    gTotal.diff += r.diff || 0;
-  });
+
+  if (isSummary) {
+    // group by code+batch — แสดง 1 row ต่อรหัส (รวมทุกกอง)
+    var codeMap = {};
+    rows.forEach(function(r) {
+      var key = r.batch + '||' + r.code;
+      if (!codeMap[key]) codeMap[key] = {code:r.code, name:r.name, batch:r.batch,
+        sapTotal:r.sapTotal||r.sapStock, counted:0, diffTotal:0};
+      codeMap[key].counted += r.counted||0;
+    });
+    Object.values(codeMap).forEach(function(d,i) {
+      d.diffTotal = d.counted - d.sapTotal;
+      var dc = d.diffTotal<0?'color:#dc2626;font-weight:700':d.diffTotal>0?'color:#d97706;font-weight:700':'color:#059669';
+      tblRows += '<tr style="border-bottom:1px solid #e5e7eb">' +
+        '<td style="padding:5px 8px;font-size:10px">' + (i+1) + '</td>' +
+        '<td style="padding:5px 8px;font-family:monospace;font-size:10px">' + d.code + '</td>' +
+        '<td style="padding:5px 8px;font-size:10px">' + d.name + '</td>' +
+        '<td style="padding:5px 8px;text-align:center;font-size:10px">' + d.batch + '</td>' +
+        '<td style="padding:5px 8px;text-align:right;font-size:10px">' + d.sapTotal.toLocaleString() + '</td>' +
+        '<td style="padding:5px 8px;text-align:right;font-size:10px;font-weight:700;color:#1d4ed8">' + d.counted.toLocaleString() + '</td>' +
+        '<td style="padding:5px 8px;text-align:right;font-size:10px;' + dc + '">' + (d.diffTotal>0?'+':'') + d.diffTotal.toLocaleString() + '</td>' +
+        '</tr>';
+      gTotal.sap += d.sapTotal; gTotal.counted += d.counted; gTotal.diff += d.diffTotal;
+    });
+  } else {
+    // แสดงทีละกอง พร้อม sub-location
+    rows.forEach(function(r,i) {
+      var dc = r.diff<0?'color:#dc2626;font-weight:700':r.diff>0?'color:#d97706;font-weight:700':'color:#059669';
+      var subHtml = '';
+      if (r.subs && Object.keys(r.subs).length) {
+        subHtml = '<br><span style="font-size:9px;color:#6b7280">' +
+          Object.entries(r.subs).filter(function(e){return e[1]>0;})
+            .map(function(e){return e[0]+':'+e[1];}).join(', ') + '</span>';
+      }
+      tblRows += '<tr style="border-bottom:1px solid #e5e7eb">' +
+        '<td style="padding:5px 8px;font-size:10px">' + (i+1) + '</td>' +
+        '<td style="padding:5px 8px;font-family:monospace;font-size:10px">' + r.code + '</td>' +
+        '<td style="padding:5px 8px;font-size:10px">' + r.name + subHtml + '</td>' +
+        '<td style="padding:5px 8px;text-align:center;font-size:10px">' + r.batch + '</td>' +
+        '<td style="padding:5px 8px;text-align:right;font-size:10px">' + (r.sapStock||0).toLocaleString() + '</td>' +
+        '<td style="padding:5px 8px;text-align:right;font-size:10px;font-weight:700;color:#1d4ed8">' + (r.counted||0).toLocaleString() + '</td>' +
+        '<td style="padding:5px 8px;text-align:right;font-size:10px;' + dc + '">' + (r.diff>0?'+':'') + (r.diff||0).toLocaleString() + '</td>' +
+        '<td style="padding:5px 8px;font-size:9px;color:#6b7280">' + (r.note||'') + '</td>' +
+        '</tr>';
+      gTotal.sap += r.sapStock||0; gTotal.counted += r.counted||0; gTotal.diff += r.diff||0;
+    });
+  }
+
+  var lastColSpan = isSummary ? 4 : 5;
+  var noteCol = isSummary ? '' : '<th style="padding:6px 8px;font-size:10px;text-align:left">หมายเหตุ</th>';
+  var noteColTd = isSummary ? '' : '<td></td>';
 
   var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
-    '<style>@page{size:A4 landscape;margin:12mm}body{font-family:Sarabun,Tahoma,sans-serif;color:#000;font-size:13px}' +
-    'table{border-collapse:collapse;width:100%}' +
-    '@media print{.noprint{display:none}}</style></head><body>' +
+    '<style>@page{size:A4 landscape;margin:10mm}body{font-family:Sarabun,Tahoma,sans-serif;color:#000}' +
+    'table{border-collapse:collapse;width:100%} @media print{.noprint{display:none}}</style>' +
+    '</head><body>' +
     '<div class="noprint" style="text-align:right;margin-bottom:8px">' +
     '<button onclick="window.print()" style="padding:7px 20px;background:#6d28d9;color:#fff;border:none;border-radius:6px;font-family:Sarabun;font-size:13px;cursor:pointer">🖨 พิมพ์</button></div>' +
-    '<div style="text-align:center;margin-bottom:12px">' +
-    '<div style="font-size:15px;font-weight:700">รายงานยอดตรวจนับผลิตภัณฑ์คอนกรีต</div>' +
-    '<div style="font-size:13px;margin-top:3px">การไฟฟ้าส่วนภูมิภาคจังหวัดกระบี่ (กฟภ.กระบี่)</div>' +
-    '<div style="font-size:12px;color:#6b7280">' + _ccRound + '</div>' +
-    '<div style="font-size:11px;color:#6b7280">วันที่ตรวจนับ: ' + (_ccDate||'–') + (_ccMb52Date ? ' | ข้อมูล MB52 ณ ' + _ccMb52Date : '') + '</div>' +
+    '<div style="text-align:center;margin-bottom:10px">' +
+    '<div style="font-size:14px;font-weight:700">รายงานยอดตรวจนับผลิตภัณฑ์คอนกรีต</div>' +
+    '<div style="font-size:12px">การไฟฟ้าส่วนภูมิภาคจังหวัดกระบี่ (กฟภ.กระบี่)</div>' +
+    '<div style="font-size:11px;color:#374151;margin-top:2px">' + _ccRound + '</div>' +
+    '<div style="font-size:10px;color:#6b7280">วันที่ตรวจนับ: ' + (_ccDate||'–') +
+      (_ccMb52Date?' | ข้อมูล MB52 ณ '+_ccMb52Date:'') + '</div>' +
+    '<div style="font-size:11px;font-weight:600;color:#6d28d9;margin-top:3px">กอง: ' + title + '</div>' +
     '</div>' +
-    '<table>' +
-    '<thead><tr style="background:#f3f0ff;border-bottom:2px solid #6d28d9">' +
-    '<th style="padding:6px 8px;font-size:11px;text-align:left">ลำดับ</th>' +
-    '<th style="padding:6px 8px;font-size:11px;text-align:left">รหัสวัสดุ</th>' +
-    '<th style="padding:6px 8px;font-size:11px;text-align:left">ชื่อพัสดุ</th>' +
-    '<th style="padding:6px 8px;font-size:11px;text-align:center">แบทช์</th>' +
-    '<th style="padding:6px 8px;font-size:11px;text-align:center">กองหมอน</th>' +
-    '<th style="padding:6px 8px;font-size:11px;text-align:right">ยอด SAP</th>' +
-    '<th style="padding:6px 8px;font-size:11px;text-align:right;color:#1d4ed8">ยอดนับจริง</th>' +
-    '<th style="padding:6px 8px;font-size:11px;text-align:right">ผลต่าง</th>' +
-    '<th style="padding:6px 8px;font-size:11px;text-align:left">หมายเหตุ</th>' +
-    '</tr></thead>' +
-    '<tbody>' + tblRows + '</tbody>' +
-    '<tfoot><tr style="background:#f9f9f9;border-top:2px solid #6d28d9;font-weight:700">' +
-    '<td colspan="5" style="padding:6px 8px;font-size:12px">รวมทั้งหมด (' + rows.length + ' รายการ)</td>' +
-    '<td style="padding:6px 8px;text-align:right;font-size:12px">' + gTotal.sap.toLocaleString() + '</td>' +
-    '<td style="padding:6px 8px;text-align:right;font-size:12px;color:#1d4ed8">' + gTotal.counted.toLocaleString() + '</td>' +
-    '<td style="padding:6px 8px;text-align:right;font-size:12px;' + (gTotal.diff<0?'color:#dc2626':gTotal.diff>0?'color:#d97706':'color:#059669') + '">' + (gTotal.diff>0?'+':'') + gTotal.diff.toLocaleString() + '</td>' +
-    '<td></td></tr></tfoot>' +
-    '</table>' +
-    '<table style="margin-top:24px;width:100%"><tr>' +
-    '<td style="width:33%;text-align:center;font-size:12px;padding-top:8px">.......................................<br>ผู้ตรวจนับ<br>........../........../.........</td>' +
-    '<td style="width:33%;text-align:center;font-size:12px;padding-top:8px">.......................................<br>ผู้ตรวจสอบ<br>........../........../.........</td>' +
-    '<td style="width:33%;text-align:center;font-size:12px;padding-top:8px">.......................................<br>ผู้อนุมัติ<br>........../........../.........</td>' +
-    '</tr></table>' +
-    '</body></html>';
+    '<table><thead><tr style="background:#f3f0ff;border-bottom:2px solid #6d28d9">' +
+    '<th style="padding:5px 8px;font-size:10px;text-align:left">ลำดับ</th>' +
+    '<th style="padding:5px 8px;font-size:10px;text-align:left">รหัสวัสดุ</th>' +
+    '<th style="padding:5px 8px;font-size:10px;text-align:left">ชื่อพัสดุ</th>' +
+    '<th style="padding:5px 8px;font-size:10px;text-align:center">แบทช์</th>' +
+    '<th style="padding:5px 8px;font-size:10px;text-align:right">ยอด SAP</th>' +
+    '<th style="padding:5px 8px;font-size:10px;text-align:right;color:#1d4ed8">ยอดนับจริง</th>' +
+    '<th style="padding:5px 8px;font-size:10px;text-align:right">ผลต่าง</th>' +
+    noteCol +
+    '</tr></thead><tbody>' + tblRows + '</tbody>' +
+    '<tfoot><tr style="background:#f5f3ff;border-top:2px solid #6d28d9;font-weight:700">' +
+    '<td colspan="' + lastColSpan + '" style="padding:5px 8px;font-size:11px">รวมทั้งหมด (' + rows.length + ' รายการ)</td>' +
+    '<td style="padding:5px 8px;text-align:right;font-size:11px">' + gTotal.sap.toLocaleString() + '</td>' +
+    '<td style="padding:5px 8px;text-align:right;font-size:11px;color:#1d4ed8">' + gTotal.counted.toLocaleString() + '</td>' +
+    '<td style="padding:5px 8px;text-align:right;font-size:11px;' + (gTotal.diff<0?'color:#dc2626':gTotal.diff>0?'color:#d97706':'color:#059669') + '">' +
+      (gTotal.diff>0?'+':'') + gTotal.diff.toLocaleString() + '</td>' +
+    noteColTd + '</tr></tfoot></table>' +
+    '<table style="margin-top:20px;width:100%"><tr>' +
+    '<td style="width:33%;text-align:center;font-size:11px;padding-top:8px">..............................<br>ผู้ตรวจนับ<br>........../........../.........</td>' +
+    '<td style="width:33%;text-align:center;font-size:11px;padding-top:8px">..............................<br>ผู้ตรวจสอบ<br>........../........../.........</td>' +
+    '<td style="width:33%;text-align:center;font-size:11px;padding-top:8px">..............................<br>ผู้อนุมัติ<br>........../........../.........</td>' +
+    '</tr></table></body></html>';
 
   var w = window.open('', '_blank', 'width=1100,height=800');
   if (w) { w.document.write(html); w.document.close(); }
   else showToast('กรุณาอนุญาต popup ในเบราว์เซอร์', true);
 }
+
 
 // ══════════════════════════════════════════════════════════════
 // SAVE STAT → Google Sheets
@@ -8627,6 +8766,7 @@ async function ccLoadSelectedRound() {
       });
     }
     ccGoStep(3);
+    _ccPopulatePdfLocs();
     showToast('โหลดรอบ ' + selRound + ' สำเร็จ ' + _ccResult.length + ' รายการ ✓');
   } catch(e) {
     showToast('โหลดไม่สำเร็จ: ' + e.message, true);
