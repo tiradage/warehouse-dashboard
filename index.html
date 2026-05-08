@@ -8048,10 +8048,13 @@ function ccExportExcel() {
         var sapLoc = (c.whStock && c.whStock[loc.id]) ? (parseFloat(c.whStock[loc.id])||0) : 0;
         row[loc.sapC] = sapLoc;
 
-        // sub cols — pre-fill จากรอบก่อน
-        loc.subCols.forEach(function(sc) {
-          var pKey = c.code + '||' + loc.id + '||' + sc.name;
-          row[sc.col] = prefill[pKey] || 0;
+        // sub cols — pre-fill ยอดนับรวม(กอง) ไว้ที่ sub col แรก
+        // (CONCRETE_STAT เก็บแค่ยอดรวม ไม่มี breakdown sub)
+        var totalKey = c.code + '||' + loc.id + '||__total__';
+        var prefillTotal = prefill[totalKey] || 0;
+        loc.subCols.forEach(function(sc, si) {
+          // ใส่ยอดรวมไว้ที่ sub col แรก, col อื่น = 0 ให้ผู้ใช้แก้ไขเอง
+          row[sc.col] = (si === 0 && prefillTotal > 0) ? prefillTotal : 0;
         });
 
         // นับรวม(กอง) = SUM(sub cols) — สูตร Excel
