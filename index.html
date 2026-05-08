@@ -8087,8 +8087,8 @@ function ccExportExcel() {
       var totalCntCell = XLSX.utils.encode_cell({r:rowIdx, c:totalCntC});
       var sapTotalCell = XLSX.utils.encode_cell({r:rowIdx, c:3});
       row[totalDiffC] = {f: totalCntCell + '-' + sapTotalCell};
-      // หมายเหตุรวมทุกกอง — กรอกเอง (pre-fill จากรอบก่อน ถ้าเลือก)
-      var noteKey = c.code + '||__total__note__';
+      // หมายเหตุรวมทุกกอง — pre-fill จากรอบก่อน
+      var noteKey = c.code + '||__totalNote__';
       row[totalNoteC] = prefill[noteKey] || '';
 
       sheetData.push(row);
@@ -8166,10 +8166,11 @@ async function ccLoadPrefillRounds() {
         var code = r[4]||''; var wh = r[6]||''; var note = r[14]||'';
         // เก็บ note
         _ccPrefillData[code+'||'+wh+'||note'] = note;
-        // ยอดนับรวม (ไม่มี sub breakdown ใน sheet — ใส่ทั้งหมดไว้ที่ sub แรก)
-        // จะ pre-fill ใน sub col แรกของกองนั้น
         var cnt = parseFloat(r[9])||0;
         _ccPrefillData[code+'||'+wh+'||__total__'] = cnt;
+        // หมายเหตุรวมทุกกอง — col[14]
+        var noteTotal = r[14]||'';
+        if (noteTotal) _ccPrefillData[code+'||__totalNote__'] = noteTotal;
       });
       showToast('เลือกรอบ ' + sel + ' สำหรับ pre-fill ✓');
     };
@@ -8485,12 +8486,15 @@ function _ccGeneratePDF(rows, title, isSummary) {
     rows.forEach(function(r) {
       var key = r.batch + '||' + r.code;
       if (!codeMap[key]) codeMap[key] = {code:r.code, name:r.name, batch:r.batch,
-        sapTotal:r.sapTotal||r.sapStock, counted:0, diffTotal:0};
+        sapTotal:r.sapTotal||r.sapStock, counted:0, diffTotal:0,
+        noteTotal:r.noteTotal||''};
       codeMap[key].counted += r.counted||0;
+      if (r.noteTotal && !codeMap[key].noteTotal) codeMap[key].noteTotal = r.noteTotal;
     });
     Object.values(codeMap).forEach(function(d,i) {
       d.diffTotal = d.counted - d.sapTotal;
       var dc = d.diffTotal<0?'color:#dc2626;font-weight:700':d.diffTotal>0?'color:#d97706;font-weight:700':'color:#059669';
+      var noteHtml = d.noteTotal ? '<span style="font-size:9px;color:#6b7280;display:block;white-space:pre-wrap">' + d.noteTotal + '</span>' : '';
       tblRows += '<tr style="border-bottom:1px solid #e5e7eb">' +
         '<td style="padding:5px 8px;font-size:10px">' + (i+1) + '</td>' +
         '<td style="padding:5px 8px;font-family:monospace;font-size:10px">' + d.code + '</td>' +
@@ -8499,6 +8503,7 @@ function _ccGeneratePDF(rows, title, isSummary) {
         '<td style="padding:5px 8px;text-align:right;font-size:10px">' + d.sapTotal.toLocaleString() + '</td>' +
         '<td style="padding:5px 8px;text-align:right;font-size:10px;font-weight:700;color:#1d4ed8">' + d.counted.toLocaleString() + '</td>' +
         '<td style="padding:5px 8px;text-align:right;font-size:10px;' + dc + '">' + (d.diffTotal>0?'+':'') + d.diffTotal.toLocaleString() + '</td>' +
+        '<td style="padding:5px 8px;font-size:9px;color:#6b7280;max-width:200px;white-space:pre-wrap">' + (d.noteTotal||'') + '</td>' +
         '</tr>';
       gTotal.sap += d.sapTotal; gTotal.counted += d.counted; gTotal.diff += d.diffTotal;
     });
@@ -8555,7 +8560,7 @@ function _ccGeneratePDF(rows, title, isSummary) {
     noteCol +
     '</tr></thead><tbody>' + tblRows + '</tbody>' +
     '<tfoot><tr style="background:#f5f3ff;border-top:2px solid #6d28d9;font-weight:700">' +
-    '<td colspan="' + lastColSpan + '" style="padding:5px 8px;font-size:11px">รวมทั้งหมด (' + rows.length + ' รายการ)</td>' +
+    '<td colspan="' + (isSummary ? lastColSpan+1 : lastColSpan) + '" style="padding:5px 8px;font-size:11px">รวมทั้งหมด (' + (isSummary ? Object.keys(codeMap).length : rows.length) + ' รายการ)</td>' +
     '<td style="padding:5px 8px;text-align:right;font-size:11px">' + gTotal.sap.toLocaleString() + '</td>' +
     '<td style="padding:5px 8px;text-align:right;font-size:11px;color:#1d4ed8">' + gTotal.counted.toLocaleString() + '</td>' +
     '<td style="padding:5px 8px;text-align:right;font-size:11px;' + (gTotal.diff<0?'color:#dc2626':gTotal.diff>0?'color:#d97706':'color:#059669') + '">' +
