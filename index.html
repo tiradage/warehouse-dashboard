@@ -8424,11 +8424,10 @@ function ccPrintPDF() {
 // ══════════════════════════════════════════════════════════════
 // SAVE STAT → Google Sheets
 // ══════════════════════════════════════════════════════════════
-async function ccSaveStat() {
+function ccSaveStat() {
   if (!_ccResult.length) { showToast('ไม่มีข้อมูล', true); return; }
-  try { await ensureToken(); } catch(e) { showToast('กรุณา Login ด้วย Google ก่อน', true); return; }
-  // เปิด modal ให้กรอกข้อมูลก่อนบันทึก
-  ccOpenSaveModal(); return;
+  // เปิด modal ก่อน — ensureToken ทำใน ccConfirmSave
+  ccOpenSaveModal();
 }
 
 function ccOpenSaveModal() {
@@ -8442,7 +8441,11 @@ function ccOpenSaveModal() {
   if (m) m.value = _ccMb52Date || (document.getElementById('ccMb52Date')||{}).value || '';
   if (w) w.style.display = 'none';
   var modal = document.getElementById('ccSaveModal');
-  if (modal) { modal.style.display = 'flex'; }
+  if (modal) {
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+  }
 }
 
 function ccCloseSaveModal() {
@@ -8461,6 +8464,12 @@ async function ccConfirmSave() {
     return;
   }
 
+  // ตรวจ login ก่อนปิด modal
+  try { await ensureToken(); } catch(e) {
+    if (warnEl) { warnEl.style.display=''; warnEl.textContent='⚠ กรุณา Login Google ก่อนบันทึก'; }
+    return;
+  }
+
   // อัปเดต global vars
   _ccRound    = round;
   _ccDate     = dateVal;
@@ -8470,7 +8479,10 @@ async function ccConfirmSave() {
 
   // บันทึกจริง
   var STAT_SHEET = 'CONCRETE_STAT';
-  var now = new Date().toLocaleString('th-TH');
+  // ใช้ ISO format เพื่อป้องกัน Sheets แปลงเป็น serial number
+  var _d = new Date();
+  var now = _d.getFullYear() + '-' + String(_d.getMonth()+1).padStart(2,'0') + '-' + String(_d.getDate()).padStart(2,'0') +
+            ' ' + String(_d.getHours()).padStart(2,'0') + ':' + String(_d.getMinutes()).padStart(2,'0');
 
   // header + data rows
   var header = [['รอบตรวจนับ','ช่วงวันที่ตรวจนับ','วันที่อ้างอิง MB52','แบทช์','รหัสพัสดุ','ชื่อพัสดุ',
@@ -8533,27 +8545,28 @@ async function ccLoadRounds() {
     var rows = (data.values || []).slice(1); // skip header
 
     // group by round+date
+    // col[0]=รอบ, col[1]=ช่วงวันที่, col[2]=MB52date
     var roundMap = {};
     rows.forEach(function(r) {
-      var key = (r[0]||'') + '||' + (r[1]||'');
-      if (!roundMap[key]) roundMap[key] = { round: r[0]||'', date: r[1]||'', count: 0 };
+      var key = r[0]||'';
+      if (!key) return;
+      if (!roundMap[key]) roundMap[key] = { round:r[0]||'', dateRange:r[1]||'', mb52date:r[2]||'', count:0 };
       roundMap[key].count++;
     });
-    _ccRounds = Object.values(roundMap).sort(function(a,b){ return b.date.localeCompare(a.date); });
+    _ccRounds = Object.values(roundMap).sort(function(a,b){ return b.round.localeCompare(a.round); });
 
     selEl.innerHTML = '<option value="">— เลือกรอบรายงาน (' + _ccRounds.length + ' รอบ) —</option>';
     _ccRounds.forEach(function(rd) {
       var opt = document.createElement('option');
-      opt.value = rd.round + '||' + rd.date;
-      // แสดง: ชื่อรอบ | วันที่ | จำนวนรายการ
+      opt.value = rd.round;
       var label = rd.round;
-      if (rd.date) label += '  |  ' + rd.date;
+      if (rd.dateRange) label += '  |  ' + rd.dateRange;
       label += '  (' + rd.count + ' รายการ)';
       opt.textContent = label;
       selEl.appendChild(opt);
     });
     // auto-select รอบล่าสุด
-    if (_ccRounds.length > 0) selEl.value = _ccRounds[0].round + '||' + _ccRounds[0].date;
+    if (_ccRounds.length > 0) selEl.value = _ccRounds[0].round;
   } catch(e) {
     selEl.innerHTML = '<option value="">โหลดไม่สำเร็จ</option>';
   }
@@ -8563,8 +8576,9 @@ async function ccLoadRounds() {
 async function ccLoadSelectedRound() {
   var selEl = document.getElementById('ccRoundSel');
   if (!selEl || !selEl.value) return;
-  var parts = selEl.value.split('||');
-  var selRound = parts[0]; var selDate = parts[1]||'';
+  var selRound = selEl.value;
+  if (!selRound) return;
+  var selDate = '';
 
   try {
     var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_NAME_ID +
@@ -8573,21 +8587,32 @@ async function ccLoadSelectedRound() {
     var data = await res.json();
     var rows = (data.values || []).slice(1);
 
+    // col map: [0]รอบ [1]ช่วงวันที่ [2]MB52date [3]batch [4]code [5]name
+    //          [6]wh  [7]whName [8]SAP(กอง) [9]นับ(กอง) [10]ผลต่าง(กอง)
+    //          [11]SAP(รวม) [12]นับ(รวม) [13]ผลต่าง(รวม) [14]note [15]timestamp
     _ccResult = [];
-    rows.filter(function(r){ return r[0]===selRound && (r[1]===selDate||!selDate); })
+    rows.filter(function(r){ return r[0] === selRound; })
       .forEach(function(r) {
         _ccResult.push({
-          code:     r[3]||'',  name:    r[4]||'',
-          batch:    r[2]||'',  wh:      r[5]||'',
-          whName:   r[6]||'',  sapStock: parseFloat(r[7])||0,
-          counted:  parseFloat(r[8])||0, diff: parseFloat(r[9])||0,
-          sapTotal: parseFloat(r[10])||0, diffTotal: parseFloat(r[12])||0,
-          note:     r[13]||'', subs: {}
+          code:     r[4]||'',
+          name:     r[5]||'',
+          batch:    r[3]||'',
+          wh:       r[6]||'',
+          whName:   r[7]||'',
+          sapStock: parseFloat(r[8])||0,
+          counted:  parseFloat(r[9])||0,
+          diff:     parseFloat(r[10])||0,
+          sapTotal: parseFloat(r[11])||0,
+          diffTotal:parseFloat(r[13])||0,
+          note:     r[14]||'',
+          subs: {}
         });
       });
 
     if (!_ccResult.length) { showToast('ไม่พบข้อมูลรอบนี้', true); return; }
-    _ccRound = selRound; _ccDate = selDate;
+    _ccRound = selRound;
+    _ccDate  = rows.find(function(r){return r[0]===selRound;})?.[1] || selDate;
+    _ccMb52Date = rows.find(function(r){return r[0]===selRound;})?.[2] || '';
 
     // update loc dropdown
     var locSel = document.getElementById('ccLocToggle');
@@ -8610,7 +8635,7 @@ async function ccLoadSelectedRound() {
 
 </script>
   <!-- ══ Modal: กรอกข้อมูลก่อนบันทึกสถิติ ══ -->
-  <div id="ccSaveModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div id="ccSaveModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
     <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:28px;width:min(520px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.4)">
       <div style="font-size:1rem;font-weight:700;color:var(--text);margin-bottom:4px">💾 บันทึกสถิติการตรวจนับ</div>
       <div style="font-size:.78rem;color:var(--muted);margin-bottom:20px">กรุณาตรวจสอบและกรอกข้อมูลให้ครบก่อนบันทึก</div>
