@@ -8175,14 +8175,10 @@ async function ccLoadPrefillRounds() {
       selEl.appendChild(opt);
     });
     // เก็บ raw data สำหรับ pre-fill — อ่าน col แบบ dynamic จาก header
-    var hdrPf = existRows[0] || [];
-    var pfNoteCol=-1, pfNoteTotalCol=-1;
-    for (var pfi=11; pfi<hdrPf.length; pfi++) {
-      var ph = String(hdrPf[pfi]||'').trim();
-      if (ph==='หมายเหตุ(กอง)'||ph==='หมายเหตุ') pfNoteCol=pfi;
-      else if (ph==='หมายเหตุ(รวม)') pfNoteTotalCol=pfi;
-      else if (ph==='บันทึกเมื่อ') break;
-    }
+    var hdrPf2 = existRows[0] || [];
+    var pfNoteCol = hdrPf2.indexOf('หมายเหตุ(กอง)');
+    if (pfNoteCol<0) pfNoteCol = hdrPf2.indexOf('หมายเหตุ');
+    var pfNoteTotalCol = hdrPf2.indexOf('หมายเหตุ(รวม)');
 
     selEl.onchange = function() {
       var sel = selEl.value;
@@ -8668,30 +8664,19 @@ async function ccConfirmSave() {
             ' ' + String(_d.getHours()).padStart(2,'0') + ':' + String(_d.getMinutes()).padStart(2,'0');
 
   // header + data rows
-  // สร้าง sub-location cols header แบบ dynamic
-  // หา sub names ทั้งหมดที่มีในผลลัพธ์
-  var allSubNames = [];
-  _ccResult.forEach(function(r) {
-    if (r.subs) Object.keys(r.subs).forEach(function(s) {
-      if (allSubNames.indexOf(s) < 0) allSubNames.push(s);
-    });
-  });
-  allSubNames.sort();
-
+  // เก็บ sub-location เป็น JSON string ใน 1 col — ไม่กระทบ col อื่นถ้าเพิ่ม/เปลี่ยน sub
   var header = [['รอบตรวจนับ','ช่วงวันที่ตรวจนับ','วันที่อ้างอิง MB52','แบทช์','รหัสพัสดุ','ชื่อพัสดุ',
-                 'กอง','ชื่อกอง','SAP(กอง)','นับ(กอง)','ผลต่าง(กอง)']
-                .concat(allSubNames)
-                .concat(['SAP(รวม)','นับ(รวม)','ผลต่าง(รวม)','หมายเหตุ(กอง)','หมายเหตุ(รวม)','บันทึกเมื่อ'])];
+                 'กอง','ชื่อกอง','SAP(กอง)','นับ(กอง)','ผลต่าง(กอง)',
+                 'sub-location (JSON)','SAP(รวม)','นับ(รวม)','ผลต่าง(รวม)',
+                 'หมายเหตุ(กอง)','หมายเหตุ(รวม)','บันทึกเมื่อ']];
 
   var dataRows = _ccResult.map(function(r) {
-    var subVals = allSubNames.map(function(s) {
-      return (r.subs && r.subs[s]) ? r.subs[s] : 0;
-    });
+    var subsJson = (r.subs && Object.keys(r.subs).length) ? JSON.stringify(r.subs) : '';
     return [_ccRound, _ccDate, _ccMb52Date, r.batch, r.code, r.name,
-            r.wh, r.whName, r.sapStock, r.counted, r.diff]
-      .concat(subVals)
-      .concat([r.sapTotal||r.sapStock, r.counted, r.diffTotal||r.diff,
-               r.note||'', r.noteTotal||'', now]);
+            r.wh, r.whName, r.sapStock, r.counted, r.diff,
+            subsJson,
+            r.sapTotal||r.sapStock, r.counted, r.diffTotal||r.diff,
+            r.note||'', r.noteTotal||'', now];
   });
 
   try {
@@ -8788,42 +8773,38 @@ async function ccLoadSelectedRound() {
 
     // อ่าน header row แรก (row[0]) เพื่อ map col แบบ dynamic
     var hdrRow = existRows[0] || [];
-    var ci_round=0,ci_date=1,ci_mb52=2,ci_batch=3,ci_code=4,ci_name=5,
-        ci_wh=6,ci_whName=7,ci_sap=8,ci_cnt=9,ci_diff=10;
-    var ci_sapTotal=-1,ci_cntTotal=-1,ci_diffTotal=-1,ci_note=-1,ci_noteTotal=-1;
-    var subCols=[]; // [{name,ci}]
-    for(var hi=11;hi<hdrRow.length;hi++){
-      var h=String(hdrRow[hi]||'').trim();
-      if(h==='SAP(รวม)')       ci_sapTotal=hi;
-      else if(h==='นับ(รวม)') ci_cntTotal=hi;
-      else if(h==='ผลต่าง(รวม)') ci_diffTotal=hi;
-      else if(h==='หมายเหตุ(กอง)'||h==='หมายเหตุ') ci_note=hi;
-      else if(h==='หมายเหตุ(รวม)') ci_noteTotal=hi;
-      else if(h==='บันทึกเมื่อ') break;
-      else if(h) subCols.push({name:h,ci:hi});
-    }
+    // col map แบบ fixed (JSON sub format)
+    // [0]รอบ [1]ช่วงวันที่ [2]MB52 [3]batch [4]code [5]name
+    // [6]wh [7]whName [8]SAP(กอง) [9]นับ(กอง) [10]ผลต่าง(กอง)
+    // [11]sub-location(JSON) [12]SAP(รวม) [13]นับ(รวม) [14]ผลต่าง(รวม)
+    // [15]หมายเหตุ(กอง) [16]หมายเหตุ(รวม) [17]บันทึกเมื่อ
+    // รองรับ format เก่า (ไม่มี JSON col) ด้วย dynamic detection
+    var hdrRow0 = existRows[0] || [];
+    var ci_sub = hdrRow0.indexOf('sub-location (JSON)');
+    var ci_sapTot = ci_sub>=0 ? ci_sub+1 : 11;
+    var ci_noteLoc = ci_sub>=0 ? ci_sub+4 : -1;
+    var ci_noteTot = ci_sub>=0 ? ci_sub+5 : -1;
 
     _ccResult = [];
     rows.filter(function(r){ return r[0] === selRound; })
       .forEach(function(r) {
-        var subs={};
-        subCols.forEach(function(sc){
-          var v=parseFloat(r[sc.ci])||0;
-          if(v) subs[sc.name]=v;
-        });
+        var subs = {};
+        if (ci_sub>=0 && r[ci_sub]) {
+          try { subs = JSON.parse(r[ci_sub])||{}; } catch(e){}
+        }
         _ccResult.push({
-          code:      r[ci_code]||'',
-          name:      r[ci_name]||'',
-          batch:     r[ci_batch]||'',
-          wh:        r[ci_wh]||'',
-          whName:    r[ci_whName]||'',
-          sapStock:  parseFloat(r[ci_sap])||0,
-          counted:   parseFloat(r[ci_cnt])||0,
-          diff:      parseFloat(r[ci_diff])||0,
-          sapTotal:  ci_sapTotal>=0 ? parseFloat(r[ci_sapTotal])||0 : 0,
-          diffTotal: ci_diffTotal>=0 ? parseFloat(r[ci_diffTotal])||0 : 0,
-          note:      ci_note>=0 ? r[ci_note]||'' : '',
-          noteTotal: ci_noteTotal>=0 ? r[ci_noteTotal]||'' : '',
+          code:      r[4]||'',
+          name:      r[5]||'',
+          batch:     r[3]||'',
+          wh:        r[6]||'',
+          whName:    r[7]||'',
+          sapStock:  parseFloat(r[8])||0,
+          counted:   parseFloat(r[9])||0,
+          diff:      parseFloat(r[10])||0,
+          sapTotal:  parseFloat(r[ci_sapTot])||0,
+          diffTotal: parseFloat(r[ci_sapTot+2])||0,
+          note:      ci_noteLoc>=0 ? r[ci_noteLoc]||'' : '',
+          noteTotal: ci_noteTot>=0 ? r[ci_noteTot]||'' : '',
           subs:      subs
         });
       });
