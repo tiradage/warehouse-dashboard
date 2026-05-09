@@ -3438,7 +3438,10 @@ function handleFile(event){
         const wh = whRaw!==undefined&&whRaw!==''
           ? String(typeof whRaw==='number'?Math.round(whRaw):whRaw).trim().replace(/-/g,'').padStart(4,'0')
           : '';
-        const batch = r[iBatch]?String(r[iBatch]).trim():'';
+        // normalize SAP batch number → N หรือ R
+        var batchRaw_ = r[iBatch]?String(r[iBatch]).trim():'';
+        const batch = batchRaw_===''?'N': batchRaw_==='N'?'N': batchRaw_==='R'?'R':
+                      batchRaw_.startsWith('N')?'N': batchRaw_.startsWith('R')?'R':'N';
         if(iName>=0 && r[iName]) nameMap[code]=String(r[iName]).trim();
 
         // group by code+batch (1 แถวต่อ code+batch)
@@ -7796,6 +7799,21 @@ var CC_DEFAULT_LOCS = [
   {id:'6009', name:'กฟส.เหนือคลอง',      subs:'กฟส.หคง., ห้วยคราม, ห้วยมัด+อบต.'},
 ];
 
+// SUB_RENAME: norm key (ลบช่องว่าง) → ชื่อใหม่
+// ใช้ใน Export เพื่อ match กับ default sub-location
+var CC_SUB_RENAME_NORM = {
+  'สถานี':                    'สถานีกระบี่',
+  'ใต้ไลน์(ขนย้ายไม่ได้)':   'ใต้ไลน์',
+  'กฟส.ลำทับ':                'ลำทับ',
+  'กองหมอนบนเกาะ':            'หัวสะพานบนเกาะ',
+  'หน้างานศูนย์พัฒนาเด็ก':   'ศูนย์พัฒนาเด็กเล็ก',
+  'ศูนย์กีฬาทางทะเล':         'ศูนย์กีฬาทางทะเล',
+  'สถานี.อล.':                'สถานีอ่าวลึก',
+  'ห้วยมัด/อบต.':             'ห้วยมัด+อบต.',
+  'กฟส.หคง':                  'กฟส.หคง.',
+  'สามแยกในสระ':              'สามแยกในสระ',
+};
+
 // ── Keywords คอนกรีต ──────────────────────────────────────────
 // รหัสคอนกรีตขึ้นต้นด้วย "100" เสมอ
 function _ccIsConcreteCode(code) {
@@ -8156,20 +8174,27 @@ async function ccLoadPrefillRounds() {
       opt.textContent = rd.round + (rd.dateRange ? ' | '+rd.dateRange : '') + ' ('+rd.count+' รายการ)';
       selEl.appendChild(opt);
     });
-    // เก็บ raw data สำหรับ pre-fill
+    // เก็บ raw data สำหรับ pre-fill — อ่าน col แบบ dynamic จาก header
+    var hdrPf = existRows[0] || [];
+    var pfNoteCol=-1, pfNoteTotalCol=-1;
+    for (var pfi=11; pfi<hdrPf.length; pfi++) {
+      var ph = String(hdrPf[pfi]||'').trim();
+      if (ph==='หมายเหตุ(กอง)'||ph==='หมายเหตุ') pfNoteCol=pfi;
+      else if (ph==='หมายเหตุ(รวม)') pfNoteTotalCol=pfi;
+      else if (ph==='บันทึกเมื่อ') break;
+    }
+
     selEl.onchange = function() {
       var sel = selEl.value;
       _ccPrefillData = {};
       if (!sel) return;
       rows.filter(function(r){return r[0]===sel;}).forEach(function(r){
-        // col: [0]รอบ [1]ช่วงวันที่ [2]MB52 [3]batch [4]code [5]name [6]wh [7]whName [8]SAP(กอง) [9]นับ(กอง) [10]ผลต่าง [11]SAP(รวม) [12]นับ(รวม) [13]ผลต่าง(รวม) [14]note
-        var code = r[4]||''; var wh = r[6]||''; var note = r[14]||'';
-        // เก็บ note
-        _ccPrefillData[code+'||'+wh+'||note'] = note;
+        var code = r[4]||''; var wh = r[6]||'';
         var cnt = parseFloat(r[9])||0;
         _ccPrefillData[code+'||'+wh+'||__total__'] = cnt;
-        // หมายเหตุรวมทุกกอง — col[14]
-        var noteTotal = r[14]||'';
+        var note = pfNoteCol>=0 ? r[pfNoteCol]||'' : '';
+        if (note) _ccPrefillData[code+'||'+wh+'||note'] = note;
+        var noteTotal = pfNoteTotalCol>=0 ? r[pfNoteTotalCol]||'' : '';
         if (noteTotal) _ccPrefillData[code+'||__totalNote__'] = noteTotal;
       });
       showToast('เลือกรอบ ' + sel + ' สำหรับ pre-fill ✓');
@@ -8643,14 +8668,30 @@ async function ccConfirmSave() {
             ' ' + String(_d.getHours()).padStart(2,'0') + ':' + String(_d.getMinutes()).padStart(2,'0');
 
   // header + data rows
+  // สร้าง sub-location cols header แบบ dynamic
+  // หา sub names ทั้งหมดที่มีในผลลัพธ์
+  var allSubNames = [];
+  _ccResult.forEach(function(r) {
+    if (r.subs) Object.keys(r.subs).forEach(function(s) {
+      if (allSubNames.indexOf(s) < 0) allSubNames.push(s);
+    });
+  });
+  allSubNames.sort();
+
   var header = [['รอบตรวจนับ','ช่วงวันที่ตรวจนับ','วันที่อ้างอิง MB52','แบทช์','รหัสพัสดุ','ชื่อพัสดุ',
-                 'กอง','ชื่อกอง','SAP(กอง)','นับ(กอง)','ผลต่าง(กอง)',
-                 'SAP(รวม)','นับ(รวม)','ผลต่าง(รวม)','หมายเหตุ','บันทึกเมื่อ']];
+                 'กอง','ชื่อกอง','SAP(กอง)','นับ(กอง)','ผลต่าง(กอง)']
+                .concat(allSubNames)
+                .concat(['SAP(รวม)','นับ(รวม)','ผลต่าง(รวม)','หมายเหตุ(กอง)','หมายเหตุ(รวม)','บันทึกเมื่อ'])];
+
   var dataRows = _ccResult.map(function(r) {
+    var subVals = allSubNames.map(function(s) {
+      return (r.subs && r.subs[s]) ? r.subs[s] : 0;
+    });
     return [_ccRound, _ccDate, _ccMb52Date, r.batch, r.code, r.name,
-            r.wh, r.whName, r.sapStock, r.counted, r.diff,
-            r.sapTotal||r.sapStock, r.counted, r.diffTotal||r.diff,
-            r.note||'', now];
+            r.wh, r.whName, r.sapStock, r.counted, r.diff]
+      .concat(subVals)
+      .concat([r.sapTotal||r.sapStock, r.counted, r.diffTotal||r.diff,
+               r.note||'', r.noteTotal||'', now]);
   });
 
   try {
@@ -8745,25 +8786,45 @@ async function ccLoadSelectedRound() {
     var data = await res.json();
     var rows = (data.values || []).slice(1);
 
-    // col map: [0]รอบ [1]ช่วงวันที่ [2]MB52date [3]batch [4]code [5]name
-    //          [6]wh  [7]whName [8]SAP(กอง) [9]นับ(กอง) [10]ผลต่าง(กอง)
-    //          [11]SAP(รวม) [12]นับ(รวม) [13]ผลต่าง(รวม) [14]note [15]timestamp
+    // อ่าน header row แรก (row[0]) เพื่อ map col แบบ dynamic
+    var hdrRow = existRows[0] || [];
+    var ci_round=0,ci_date=1,ci_mb52=2,ci_batch=3,ci_code=4,ci_name=5,
+        ci_wh=6,ci_whName=7,ci_sap=8,ci_cnt=9,ci_diff=10;
+    var ci_sapTotal=-1,ci_cntTotal=-1,ci_diffTotal=-1,ci_note=-1,ci_noteTotal=-1;
+    var subCols=[]; // [{name,ci}]
+    for(var hi=11;hi<hdrRow.length;hi++){
+      var h=String(hdrRow[hi]||'').trim();
+      if(h==='SAP(รวม)')       ci_sapTotal=hi;
+      else if(h==='นับ(รวม)') ci_cntTotal=hi;
+      else if(h==='ผลต่าง(รวม)') ci_diffTotal=hi;
+      else if(h==='หมายเหตุ(กอง)'||h==='หมายเหตุ') ci_note=hi;
+      else if(h==='หมายเหตุ(รวม)') ci_noteTotal=hi;
+      else if(h==='บันทึกเมื่อ') break;
+      else if(h) subCols.push({name:h,ci:hi});
+    }
+
     _ccResult = [];
     rows.filter(function(r){ return r[0] === selRound; })
       .forEach(function(r) {
+        var subs={};
+        subCols.forEach(function(sc){
+          var v=parseFloat(r[sc.ci])||0;
+          if(v) subs[sc.name]=v;
+        });
         _ccResult.push({
-          code:     r[4]||'',
-          name:     r[5]||'',
-          batch:    r[3]||'',
-          wh:       r[6]||'',
-          whName:   r[7]||'',
-          sapStock: parseFloat(r[8])||0,
-          counted:  parseFloat(r[9])||0,
-          diff:     parseFloat(r[10])||0,
-          sapTotal: parseFloat(r[11])||0,
-          diffTotal:parseFloat(r[13])||0,
-          note:     r[14]||'',
-          subs: {}
+          code:      r[ci_code]||'',
+          name:      r[ci_name]||'',
+          batch:     r[ci_batch]||'',
+          wh:        r[ci_wh]||'',
+          whName:    r[ci_whName]||'',
+          sapStock:  parseFloat(r[ci_sap])||0,
+          counted:   parseFloat(r[ci_cnt])||0,
+          diff:      parseFloat(r[ci_diff])||0,
+          sapTotal:  ci_sapTotal>=0 ? parseFloat(r[ci_sapTotal])||0 : 0,
+          diffTotal: ci_diffTotal>=0 ? parseFloat(r[ci_diffTotal])||0 : 0,
+          note:      ci_note>=0 ? r[ci_note]||'' : '',
+          noteTotal: ci_noteTotal>=0 ? r[ci_noteTotal]||'' : '',
+          subs:      subs
         });
       });
 
