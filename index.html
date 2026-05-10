@@ -8453,22 +8453,159 @@ function ccPrintPDF() {
   var selLocId = locSel ? locSel.value : '';
   var batchF   = (document.getElementById('ccBatchToggle')||{}).value || '';
 
-  // filter rows
   var allRows = _ccResult.filter(function(r){ return !batchF || r.batch === batchF; });
 
   if (selLocId) {
-    // พิมพ์เฉพาะกองที่เลือก
+    // PDF แยกกอง
     var locName = '';
     allRows.forEach(function(r){ if(r.wh===selLocId) locName=r.whName; });
-    _ccGeneratePDF(allRows.filter(function(r){ return r.wh === selLocId; }),
-      selLocId + ' ' + locName, false);
+    var locRows = allRows.filter(function(r){ return r.wh === selLocId; });
+    _ccGeneratePDF(locRows, selLocId + ' ' + locName, false);
   } else {
-    // พิมพ์สรุปรวมทุกกอง (groupby code+batch, sum counted)
+    // PDF รวมทุกกอง — group by code+batch
     _ccGeneratePDF(allRows, 'ทุกกองหมอน', true);
   }
 }
 
-// populate PDF loc selector เมื่อมีผลลัพธ์
+function _ccGroupByCodeBatch(rows) {
+  // Group long-format rows by code+batch
+  // เอา SAP(กอง→รวม), นับรวม, ผลต่าง จาก sapTotal/cntTotal/diffTotal
+  // รวม sub-location จากทุก row ของ code+batch เดียวกัน
+  var grouped = {};
+  var order = [];
+  rows.forEach(function(r) {
+    var key = r.code + '||' + r.batch;
+    if (!grouped[key]) {
+      order.push(key);
+      grouped[key] = {
+        code: r.code, name: r.name, batch: r.batch,
+        sap: r.sapTotal || r.sapStock,
+        cnt: r.cntTotal || r.counted,
+        diff: r.diffTotal || r.diff,
+        note: r.noteTotal || '',
+        subs: {}
+      };
+    }
+    // รวม sub
+    if (r.sub && r.subVal) {
+      grouped[key].subs[r.sub] = (grouped[key].subs[r.sub]||0) + r.subVal;
+    }
+  });
+  return order.map(function(k){ return grouped[k]; });
+}
+
+function _ccGroupByCodeBatchLoc(rows) {
+  // Group by code+batch — เอาข้อมูลต่อกอง (SAP(กอง), นับรวม(กอง))
+  var grouped = {};
+  var order = [];
+  rows.forEach(function(r) {
+    var key = r.code + '||' + r.batch;
+    if (!grouped[key]) {
+      order.push(key);
+      grouped[key] = {
+        code: r.code, name: r.name, batch: r.batch,
+        sap: r.sapStock,
+        cnt: r.counted,
+        diff: r.diff,
+        note: r.note || '',
+        subs: {}
+      };
+    }
+    if (r.sub && r.subVal) {
+      grouped[key].subs[r.sub] = (grouped[key].subs[r.sub]||0) + r.subVal;
+    }
+  });
+  return order.map(function(k){ return grouped[k]; });
+}
+
+function _ccGeneratePDF(rows, title, isSummary) {
+  // Group rows ก่อน
+  var data = isSummary
+    ? _ccGroupByCodeBatch(rows)
+    : _ccGroupByCodeBatchLoc(rows);
+
+  var tblRows = '';
+  var gTotal = {sap:0, cnt:0, diff:0};
+
+  data.forEach(function(d, i) {
+    var dc = d.diff<0 ? 'color:#dc2626;font-weight:700'
+           : d.diff>0 ? 'color:#d97706;font-weight:700'
+           : 'color:#059669';
+
+    // sub-location text
+    var subText = Object.keys(d.subs).length
+      ? Object.entries(d.subs).map(function(e){ return e[0]+':'+e[1]; }).join(', ')
+      : '–';
+
+    // batch badge
+    var batchStyle = d.batch==='N'
+      ? 'background:#f3e8ff;color:#7c3aed;padding:1px 6px;border-radius:3px;font-weight:700'
+      : 'background:#fefce8;color:#a16207;padding:1px 6px;border-radius:3px;font-weight:700';
+
+    tblRows += '<tr style="border-bottom:1px solid #e5e7eb">' +
+      '<td style="padding:5px 8px;font-size:15px">' + (i+1) + '</td>' +
+      '<td style="padding:5px 8px;font-family:monospace;font-size:15px">' + d.code + '</td>' +
+      '<td style="padding:5px 8px;font-size:15px">' + d.name + '</td>' +
+      '<td style="padding:5px 8px;text-align:center"><span style="' + batchStyle + '">' + d.batch + '</span></td>' +
+      '<td style="padding:5px 8px;text-align:right;font-size:15px">' + (d.sap||0).toLocaleString() + '</td>' +
+      '<td style="padding:5px 8px;text-align:right;font-size:15px;font-weight:700;color:#1d4ed8">' + (d.cnt||0).toLocaleString() + '</td>' +
+      '<td style="padding:5px 8px;text-align:right;font-size:15px;' + dc + '">' + (d.diff>0?'+':'') + (d.diff||0).toLocaleString() + '</td>' +
+      '<td style="padding:5px 8px;font-size:13px;color:#6b7280">' + subText + '</td>' +
+      '<td style="padding:5px 8px;font-size:13px;color:#374151;white-space:pre-wrap;max-width:200px">' + (d.note||'') + '</td>' +
+      '</tr>';
+
+    gTotal.sap += d.sap||0;
+    gTotal.cnt += d.cnt||0;
+    gTotal.diff += d.diff||0;
+  });
+
+  var diffStyle = gTotal.diff<0?'color:#dc2626':gTotal.diff>0?'color:#d97706':'color:#059669';
+
+  var dateStr = _ccDate || '';
+  var mb52Str = _ccMb52Date ? ' | ข้อมูล MB52 ณ ' + _ccMb52Date : '';
+
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+    '<style>' +
+    '@import url(\'https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap\');' +
+    '@page{size:A4 landscape;margin:10mm}' +
+    'body{font-family:"TH SarabunPSK","Sarabun",Tahoma,sans-serif;color:#000;font-size:16px}' +
+    'table{border-collapse:collapse;width:100%}' +
+    'th{font-size:15px;font-weight:700}' +
+    '@media print{.noprint{display:none}}' +
+    '</style></head><body>' +
+
+    '<div class="noprint" style="text-align:right;margin-bottom:8px">' +
+    '<button onclick="window.print()" style="padding:7px 20px;background:#6d28d9;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:15px;cursor:pointer">🖨 พิมพ์</button>' +
+    '</div>' +
+
+    '<div style="text-align:center;margin-bottom:12px">' +
+    '<div style="font-size:18px;font-weight:700">รายงานยอดตรวจนับผลิตภัณฑ์คอนกรีต</div>' +
+    '<div style="font-size:16px">การไฟฟ้าส่วนภูมิภาคจังหวัดกระบี่ (กฟภ.กระบี่)</div>' +
+    '<div style="font-size:15px;margin-top:2px">' + _ccRound + '</div>' +
+    '<div style="font-size:14px;color:#6b7280">วันที่ตรวจนับ: ' + dateStr + mb52Str + '</div>' +
+    '<div style="font-size:15px;font-weight:700;color:#6d28d9;margin-top:4px">กอง: ' + title + '</div>' +
+    '</div>' +
+
+    '<table><thead><tr style="background:#f3f0ff;border-bottom:2px solid #6d28d9">' +
+    '<th style="padding:6px 8px;text-align:left">ลำดับ</th>' +
+    '<th style="padding:6px 8px;text-align:left">รหัสวัสดุ</th>' +
+    '<th style="padding:6px 8px;text-align:left">ชื่อพัสดุ</th>' +
+    '<th style="padding:6px 8px;text-align:center">แบทช์</th>' +
+    '<th style="padding:6px 8px;text-align:right">ยอด SAP</th>' +
+    '<th style="padding:6px 8px;text-align:right;color:#1d4ed8">ยอดนับจริง</th>' +
+    '<th style="padding:6px 8px;text-align:right">ผลต่าง</th>' +
+    '<th style="padding:6px 8px;text-align:left">Sub-location</th>' +
+    '<th style="padding:6px 8px;text-align:left">หมายเหตุ</th>' +
+    '</tr></thead>' +
+    '<tbody>' + tblRows + '</tbody>' +
+    '</table>' +
+    '</body></html>';
+
+  var w = window.open('', '_blank', 'width=1200,height=800');
+  if (w) { w.document.write(html); w.document.close(); }
+  else showToast('กรุณาอนุญาต popup ในเบราว์เซอร์', true);
+}
+
 function _ccPopulatePdfLocs() {
   var sel = document.getElementById('ccPdfLocSel');
   if (!sel || !_ccResult.length) return;
