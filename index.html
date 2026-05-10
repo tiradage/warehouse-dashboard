@@ -8338,9 +8338,17 @@ function ccHandleUpload(event) {
         });
       }
 
-      // DEBUG: แสดง note ของ 6009
-      var dbg = _ccResult.filter(function(r){return r.wh==='6009' && r.code==='1000010001';});
-      dbg.forEach(function(r){ console.log('[note check] wh='+r.wh+' note='+r.note.substring(0,50)+' noteTotal='+r.noteTotal.substring(0,30)); });
+      // DEBUG: แสดง _ccResult 3 รายการแรก
+      console.log('[DEBUG] _ccResult.length='+_ccResult.length);
+      if (_ccResult.length > 0) {
+        var r0 = _ccResult[0];
+        console.log('[DEBUG] r0: code='+r0.code+' wh='+r0.wh+' typeof wh='+typeof r0.wh+' note='+String(r0.note||'').substring(0,40)+' noteTotal='+String(r0.noteTotal||'').substring(0,30));
+      }
+      // หา batch R
+      var rR = _ccResult.filter(function(r){return r.batch==='R';});
+      if (rR.length > 0) {
+        console.log('[DEBUG R] code='+rR[0].code+' wh='+rR[0].wh+' note='+String(rR[0].note||'').substring(0,50));
+      }
       statusEl.style.background='rgba(79,255,176,.1)';
       statusEl.style.color='var(--accent)';
       statusEl.style.border='1px solid rgba(79,255,176,.3)';
