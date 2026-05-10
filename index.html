@@ -8338,17 +8338,7 @@ function ccHandleUpload(event) {
         });
       }
 
-      // DEBUG: แสดง _ccResult 3 รายการแรก
-      console.log('[DEBUG] _ccResult.length='+_ccResult.length);
-      if (_ccResult.length > 0) {
-        var r0 = _ccResult[0];
-        console.log('[DEBUG] r0: code='+r0.code+' wh='+r0.wh+' typeof wh='+typeof r0.wh+' note='+String(r0.note||'').substring(0,40)+' noteTotal='+String(r0.noteTotal||'').substring(0,30));
-      }
-      // หา batch R
-      var rR = _ccResult.filter(function(r){return r.batch==='R';});
-      if (rR.length > 0) {
-        console.log('[DEBUG R] code='+rR[0].code+' wh='+rR[0].wh+' note='+String(rR[0].note||'').substring(0,50));
-      }
+
       statusEl.style.background='rgba(79,255,176,.1)';
       statusEl.style.color='var(--accent)';
       statusEl.style.border='1px solid rgba(79,255,176,.3)';
@@ -8457,11 +8447,11 @@ function ccPrintPDF() {
   var allRows = _ccResult.filter(function(r){ return !batchF || r.batch === batchF; });
 
   if (selLocId) {
-    // PDF แยกกอง
+    // PDF แยกกอง — ส่ง selLocId เพื่อให้ group ใช้ note ของกองนั้นเท่านั้น
     var locName = '';
     allRows.forEach(function(r){ if(r.wh===selLocId) locName=r.whName; });
     var locRows = allRows.filter(function(r){ return r.wh === selLocId; });
-    _ccGeneratePDF(locRows, selLocId + ' ' + locName, false);
+    _ccGeneratePDF(locRows, selLocId + ' ' + locName, false, selLocId);
   } else {
     // PDF รวมทุกกอง — group by code+batch
     _ccGeneratePDF(allRows, 'ทุกกองหมอน', true);
@@ -8495,25 +8485,22 @@ function _ccGroupByCodeBatch(rows) {
   return order.map(function(k){ return grouped[k]; });
 }
 
-function _ccGroupByCodeBatchLoc(rows) {
-  // Group by code+batch — เอาข้อมูลต่อกอง (SAP(กอง), นับรวม(กอง))
-  // note = หมายเหตุ(กอง) เท่านั้น ไม่รวม noteTotal
+function _ccGroupByCodeBatchLoc(rows, locId) {
+  // Group by code+batch — note ใช้เฉพาะของ locId ที่ระบุเท่านั้น
   var grouped = {};
   var order = [];
   rows.forEach(function(r) {
     var key = r.code + '||' + r.batch;
-    // ใช้ note(กอง) เฉพาะ — ถ้า note เหมือน noteTotal แสดงว่า JS อ่านผิด ให้ใช้ ''
-    // ตัด noteTotal ออกจาก note(กอง) เพื่อไม่ให้แสดงซ้ำ
     if (!grouped[key]) {
       order.push(key);
       grouped[key] = {
         code: r.code, name: r.name, batch: r.batch,
-        sap: r.sapStock,
-        cnt: r.counted,
-        diff: r.diff,
-        note: r.note || '',
+        sap: r.sapStock, cnt: r.counted, diff: r.diff,
+        note: (locId && r.wh === locId) ? (r.note || '') : '',
         subs: {}
       };
+    } else if (locId && r.wh === locId && !grouped[key].note) {
+      grouped[key].note = r.note || '';
     }
     if (r.subs) {
       Object.keys(r.subs).forEach(function(s) {
@@ -8524,11 +8511,12 @@ function _ccGroupByCodeBatchLoc(rows) {
   return order.map(function(k){ return grouped[k]; });
 }
 
-function _ccGeneratePDF(rows, title, isSummary) {
+
+function _ccGeneratePDF(rows, title, isSummary, forLocId) {
   // Group rows ก่อน
   var data = isSummary
     ? _ccGroupByCodeBatch(rows)
-    : _ccGroupByCodeBatchLoc(rows);
+    : _ccGroupByCodeBatchLoc(rows, forLocId);
 
   var tblRows = '';
   var gTotal = {sap:0, cnt:0, diff:0};
