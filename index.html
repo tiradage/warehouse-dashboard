@@ -8451,6 +8451,8 @@ function ccPrintPDF() {
     var locName = '';
     allRows.forEach(function(r){ if(r.wh===selLocId) locName=r.whName; });
     var locRows = allRows.filter(function(r){ return r.wh === selLocId; });
+    console.log('[PDF] selLocId='+selLocId+' allRows='+allRows.length+' locRows='+locRows.length);
+    if(locRows.length>0) console.log('[PDF] locRows[0] wh='+locRows[0].wh+' note='+String(locRows[0].note||'').substring(0,40));
     _ccGeneratePDF(locRows, selLocId + ' ' + locName, false, selLocId);
   } else {
     // PDF รวมทุกกอง — group by code+batch
