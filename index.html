@@ -8164,7 +8164,8 @@ async function ccLoadPrefillRounds() {
     var res = await fetch(url);
     if (!res.ok) { showToast('โหลดรายการรอบไม่สำเร็จ', true); return; }
     var data = await res.json();
-    var rows = (data.values || []).slice(1);
+    var allPfRows = data.values || [];
+    var rows = allPfRows.slice(1);
     var roundMap = {};
     rows.forEach(function(r){
       var key = r[0]||'';
@@ -8180,8 +8181,8 @@ async function ccLoadPrefillRounds() {
       opt.textContent = rd.round + (rd.dateRange ? ' | '+rd.dateRange : '') + ' ('+rd.count+' รายการ)';
       selEl.appendChild(opt);
     });
-    // เก็บ raw data สำหรับ pre-fill — อ่าน col แบบ dynamic จาก header
-    var hdrPf2 = existRows[0] || [];
+    // เก็บ raw data สำหรับ pre-fill
+    var hdrPf2 = allPfRows[0] || [];
     // Long format col index (fixed)
     var pfNoteCol = 13;      // หมายเหตุ(กอง)
     var pfNoteTotalCol = 17; // หมายเหตุ(รวม)
@@ -8711,11 +8712,7 @@ function _ccGeneratePDF(rows, title, isSummary) {
     '<td style="padding:5px 8px;text-align:right;font-size:11px;' + (gTotal.diff<0?'color:#dc2626':gTotal.diff>0?'color:#d97706':'color:#059669') + '">' +
       (gTotal.diff>0?'+':'') + gTotal.diff.toLocaleString() + '</td>' +
     noteColTd + '</tr></tfoot></table>' +
-    '<table style="margin-top:20px;width:100%"><tr>' +
-    '<td style="width:33%;text-align:center;font-size:11px;padding-top:8px">..............................<br>ผู้ตรวจนับ<br>........../........../.........</td>' +
-    '<td style="width:33%;text-align:center;font-size:11px;padding-top:8px">..............................<br>ผู้ตรวจสอบ<br>........../........../.........</td>' +
-    '<td style="width:33%;text-align:center;font-size:11px;padding-top:8px">..............................<br>ผู้อนุมัติ<br>........../........../.........</td>' +
-    '</tr></table></body></html>';
+    '</body></html>';
 
   var w = window.open('', '_blank', 'width=1100,height=800');
   if (w) { w.document.write(html); w.document.close(); }
@@ -8894,7 +8891,8 @@ async function ccLoadSelectedRound() {
       '/values/' + encodeURIComponent('CONCRETE_STAT') + '?key=' + API_KEY;
     var res = await fetch(url);
     var data = await res.json();
-    var rows = (data.values || []).slice(1);
+    var existRows = data.values || [];
+    var rows = existRows.slice(1);
 
     // อ่าน header row แรก (row[0]) เพื่อ map col แบบ dynamic
     var hdrRow = existRows[0] || [];
