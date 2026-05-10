@@ -8182,9 +8182,9 @@ async function ccLoadPrefillRounds() {
     });
     // เก็บ raw data สำหรับ pre-fill — อ่าน col แบบ dynamic จาก header
     var hdrPf2 = existRows[0] || [];
-    var pfNoteCol = hdrPf2.indexOf('หมายเหตุ(กอง)');
-    if (pfNoteCol<0) pfNoteCol = hdrPf2.indexOf('หมายเหตุ');
-    var pfNoteTotalCol = hdrPf2.indexOf('หมายเหตุ(รวม)');
+    // Long format col index (fixed)
+    var pfNoteCol = 13;      // หมายเหตุ(กอง)
+    var pfNoteTotalCol = 17; // หมายเหตุ(รวม)
 
     selEl.onchange = function() {
       var sel = selEl.value;
@@ -8206,12 +8206,11 @@ async function ccLoadPrefillRounds() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// UPLOAD & PARSE — รองรับ format v5 (row1=title, row2=group, row3=detail)
+// UPLOAD & PARSE — อ่าน concrete_v9 format (row1=title, row2=group, row3=detail)
 // ══════════════════════════════════════════════════════════════
 function ccHandleUpload(event) {
   var file = event.target.files[0];
   if (!file) return;
-
   var statusEl = document.getElementById('ccUploadStatus');
   statusEl.style.display='';
   statusEl.style.background='rgba(255,201,60,.1)';
@@ -8224,138 +8223,117 @@ function ccHandleUpload(event) {
     try {
       var wb = XLSX.read(e.target.result, {type:'array', cellFormula:false, cellNF:false});
 
-      // ── อ่าน META ──
+      // อ่าน META
       var metaWs = wb.Sheets['__META__'];
       if (!metaWs) throw new Error('ไม่พบ Sheet __META__ — กรุณาใช้ไฟล์ที่ Export จากระบบนี้');
       var metaRows = XLSX.utils.sheet_to_json(metaWs, {header:1, defval:''});
       var meta = {};
       metaRows.forEach(function(r){ if(r[0]) meta[String(r[0])] = r[1]; });
-      if (!meta['__CONCRETE_COUNT_META__']) throw new Error('ไฟล์นี้ไม่ใช่แบบฟอร์มตรวจนับจากระบบ');
+      if (!meta['__CONCRETE_COUNT_META__']) throw new Error('ไม่ใช่ไฟล์แบบฟอร์มตรวจนับจากระบบนี้');
 
       _ccRound    = meta['round']    || '';
       _ccDate     = meta['date']     || '';
       _ccMb52Date = meta['mb52date'] || '';
 
-      // parse locs จาก "id|name|subs;;..."
-      var locs = String(meta['locs']||'').split(';;').map(function(s){
-        var p=s.split('|'); return {id:p[0]||'',name:p[1]||'',subs:p[2]||''};
-      }).filter(function(l){return l.id;});
-
-      // parse SAP จาก meta (fallback)
-      var sapMapN={}, sapMapR={};
-      String(meta['codesN']||'').split(';').forEach(function(s){
-        var p=s.split(','); if(p[0]) sapMapN[p[0]]=parseFloat(p[1])||0;
-      });
-      String(meta['codesR']||'').split(';').forEach(function(s){
-        var p=s.split(','); if(p[0]) sapMapR[p[0]]=parseFloat(p[1])||0;
-      });
-
       _ccResult = [];
 
-      // ── parse แต่ละ batch sheet ──
       ['N','R'].forEach(function(batch) {
         var ws = wb.Sheets['แบทช'+batch] || wb.Sheets['แบทช์'+batch];
         if (!ws) return;
 
         var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-        // format v5: row0=title, row1=group header, row2=detail header, row3+=data
         if (rows.length < 4) return;
 
-        var grpHdr  = rows[1]; // row2: รหัสพัสดุ, ชื่อ, หน่วย, SAP, [loc group...], สรุปรวม
-        var detHdr  = rows[2]; // row3: SAP(กอง), นับรวม(กอง), ผลต่าง(กอง), sub..., หมายเหตุ
+        var hdr2 = rows[1]; // group header
+        var hdr3 = rows[2]; // detail header
 
-        // สร้าง colMap จาก grpHdr + detHdr
-        // scan grpHdr ตั้งแต่ col4 เพื่อหา loc group (มีค่า = เริ่ม group ใหม่)
-        var colMap = []; // [{type:'sap'|'cnt'|'diff'|'sub'|'note'|'totalCnt'|'totalDiff', locId, subName, ci}]
-        var curLocId = null;
+        // สร้าง col map
+        var colMap = [];
+        var curLocId = null, curLocName = null;
+        for (var ci = 4; ci < hdr2.length; ci++) {
+          var h2 = String(hdr2[ci]||'').replace(/[
+]+/g,'').trim();
+          var h3 = String(hdr3[ci]||'').replace(/[
+]+/g,'').trim();
 
-        for (var ci = 4; ci < grpHdr.length; ci++) {
-          var g = String(grpHdr[ci]||'').trim();
-          var d = String(detHdr[ci]||'').trim();
-
-          var gn = g.replace(/[\r\n]+/g,'').trim();
-          if (gn === 'สรุปรวม') {
-            // สรุปรวม block
-            colMap.push({type:'totalCnt',  ci: ci});
-            colMap.push({type:'totalDiff', ci: ci+1});
-            break;
-          }
-          if (gn) {
-            // เริ่ม group ใหม่ — extract locId (คำแรกก่อน space/newline)
-            curLocId = gn.split(/\s+/)[0];
+          if (h2 && h2 !== 'สรุปรวม') {
+            var parts = h2.split(/\s+/);
+            curLocId   = parts[0];
+            curLocName = parts.slice(1).join(' ');
           }
 
-          // normalize: ลบ newline และ whitespace ออกก่อน match
-          var dn = d.replace(/[\r\n]+/g,'').trim();
-          if (dn === 'SAP(กอง)')       colMap.push({type:'sap',  locId:curLocId, ci:ci});
-          else if (dn === 'นับรวม(กอง)') colMap.push({type:'cnt',  locId:curLocId, ci:ci});
-          else if (dn === 'ผลต่าง(กอง)') colMap.push({type:'diff', locId:curLocId, ci:ci});
-          else if (dn === 'หมายเหตุ' || d === 'หมายเหตุ') colMap.push({type:'note', locId:curLocId, ci:ci});
-          else if (d && curLocId)        colMap.push({type:'sub',  locId:curLocId, subName:dn||d, ci:ci});
+          if (h3 === 'รวมนับ(ทั้งหมด)')    colMap.push({type:'totalCnt',  ci:ci});
+          else if (h3 === 'ผลต่าง(นับ-SAP)') colMap.push({type:'totalDiff', ci:ci});
+          else if (h3 === 'หมายเหตุ(รวมทุกกอง)') colMap.push({type:'totalNote', ci:ci});
+          else if (h3 === 'SAP(กอง)')          colMap.push({type:'sap',  locId:curLocId, locName:curLocName, ci:ci});
+          else if (h3 === 'นับรวม(กอง)')       colMap.push({type:'cnt',  locId:curLocId, locName:curLocName, ci:ci});
+          else if (h3 === 'ผลต่าง(กอง)')       colMap.push({type:'diff', locId:curLocId, locName:curLocName, ci:ci});
+          else if (h3 === 'หมายเหตุ(กอง)')     colMap.push({type:'note', locId:curLocId, locName:curLocName, ci:ci});
+          else if (h3 && curLocId)              colMap.push({type:'sub',  locId:curLocId, locName:curLocName, subName:h3, ci:ci});
         }
 
-        var sapMap = batch==='N' ? sapMapN : sapMapR;
+        var totalCntCi  = -1, totalDiffCi = -1, totalNoteCi = -1;
+        colMap.forEach(function(cm) {
+          if (cm.type==='totalCnt')  totalCntCi  = cm.ci;
+          if (cm.type==='totalDiff') totalDiffCi = cm.ci;
+          if (cm.type==='totalNote') totalNoteCi = cm.ci;
+        });
 
-        // อ่าน data rows (row index 3+)
+        // parse data rows
         for (var ri = 3; ri < rows.length; ri++) {
           var row = rows[ri];
           var code = String(row[0]||'').trim();
           if (!code || !code.startsWith('100')) continue;
+          var name     = String(row[1]||'').trim();
+          var sapTotal = parseFloat(row[3])||0;
+          var cntTotal  = totalCntCi  >= 0 ? parseFloat(row[totalCntCi]) ||0 : 0;
+          var diffTotal = totalDiffCi >= 0 ? parseFloat(row[totalDiffCi])||0 : 0;
+          var noteTotal = totalNoteCi >= 0 ? String(row[totalNoteCi]||'').trim() : '';
 
-          var sapTotal = parseFloat(row[3]) || sapMap[code] || 0;
-
-          // รวม cnt per locId
-          var locCnt  = {}; // locId -> counted
-          var locSap  = {}; // locId -> sap
-          var locNote = {}; // locId -> note
-          var locSubs = {}; // locId -> {subName: val}
-
-          var noteTotal = '';
+          // รวม per loc
+          var locs = {};
           colMap.forEach(function(cm) {
-            var val = parseFloat(row[cm.ci]) || 0;
-            var s   = String(row[cm.ci]||'').trim();
-            if (cm.type==='sap')       { locSap[cm.locId]  = val; }
-            if (cm.type==='cnt')       { locCnt[cm.locId]  = val; }
-            if (cm.type==='note')      { locNote[cm.locId] = s; }
-            if (cm.type==='totalNote') { noteTotal = s; }
-            if (cm.type==='sub')  {
-              if (!locSubs[cm.locId]) locSubs[cm.locId]={};
-              locSubs[cm.locId][cm.subName] = val;
+            if (!cm.locId) return;
+            if (!locs[cm.locId]) locs[cm.locId] = {name:cm.locName||'', sap:0, cnt:0, diff:0, note:'', subs:{}};
+            var val = row[cm.ci];
+            if (cm.type==='sap')  locs[cm.locId].sap  = parseFloat(val)||0;
+            if (cm.type==='cnt')  locs[cm.locId].cnt  = parseFloat(val)||0;
+            if (cm.type==='diff') locs[cm.locId].diff = parseFloat(val)||0;
+            if (cm.type==='note') locs[cm.locId].note = String(val||'').trim();
+            if (cm.type==='sub') {
+              var sv = parseFloat(val)||0;
+              if (sv) locs[cm.locId].subs[cm.subName] = sv;
             }
           });
 
-          // สร้าง result row ต่อ loc
-          var grandCnt = 0;
-          locs.forEach(function(loc) {
-            var counted = locCnt[loc.id] || 0;
-            var sapLoc  = locSap[loc.id] || 0;
-            grandCnt += counted;
-            _ccResult.push({
-              code: code,
-              name: nameMap[code] || String(row[1]||''),
-              batch: batch,
-              wh: loc.id,
-              whName: loc.name,
-              sapStock: sapLoc,
-              sapTotal: sapTotal,
-              counted: counted,
-              diff: counted - sapLoc,
-              diffTotal: 0, // คำนวณทีหลัง
-              subs: locSubs[loc.id] || {},
-              note: locNote[loc.id] || '',
-              noteTotal: noteTotal
-            });
-          });
-
-          // อัปเดต diffTotal ทุก row ของ code นี้
-          var diffTotal = grandCnt - sapTotal;
-          _ccResult.forEach(function(r){
-            if (r.code===code && r.batch===batch) r.diffTotal = diffTotal;
+          // สร้าง _ccResult (long format)
+          Object.keys(locs).forEach(function(locId) {
+            var loc  = locs[locId];
+            var subs = loc.subs;
+            if (Object.keys(subs).length > 0) {
+              Object.keys(subs).forEach(function(subName) {
+                _ccResult.push({
+                  code:code, name:nameMap[code]||name, batch:batch,
+                  wh:locId, whName:loc.name,
+                  sub:subName, subVal:subs[subName],
+                  sapStock:loc.sap, counted:loc.cnt, diff:loc.diff, note:loc.note,
+                  sapTotal:sapTotal, cntTotal:cntTotal, diffTotal:diffTotal, noteTotal:noteTotal
+                });
+              });
+            } else {
+              _ccResult.push({
+                code:code, name:nameMap[code]||name, batch:batch,
+                wh:locId, whName:loc.name,
+                sub:'', subVal:0,
+                sapStock:loc.sap, counted:loc.cnt, diff:loc.diff, note:loc.note,
+                sapTotal:sapTotal, cntTotal:cntTotal, diffTotal:diffTotal, noteTotal:noteTotal
+              });
+            }
           });
         }
       });
 
-      if (!_ccResult.length) throw new Error('ไม่พบข้อมูลในไฟล์ — ตรวจสอบว่ากรอกยอดนับแล้ว');
+      if (!_ccResult.length) throw new Error('ไม่พบข้อมูลในไฟล์');
 
       // update loc dropdown
       var locSel = document.getElementById('ccLocToggle');
@@ -8363,7 +8341,7 @@ function ccHandleUpload(event) {
         var locSet={};
         _ccResult.forEach(function(r){ if(r.wh) locSet[r.wh]=r.whName; });
         locSel.innerHTML='<option value="">ทุกกอง</option>';
-        Object.keys(locSet).forEach(function(id){
+        Object.keys(locSet).sort().forEach(function(id){
           var opt=document.createElement('option');
           opt.value=id; opt.textContent=id+' '+locSet[id];
           locSel.appendChild(opt);
@@ -8388,6 +8366,7 @@ function ccHandleUpload(event) {
   };
   reader.readAsArrayBuffer(file);
 }
+
 
 function ccRenderResult() {
   var batchF = (document.getElementById('ccBatchToggle') || {}).value || '';
@@ -8440,7 +8419,10 @@ function ccRenderResult() {
 
     // sub-location badge
     var subHtml = '';
-    if (r.subs && Object.keys(r.subs).length) {
+    // แสดง sub จาก r.sub + r.subVal (long format)
+    if (r.sub) {
+      subHtml = '<span style="font-size:.68rem;padding:1px 6px;border-radius:3px;background:var(--surface2);color:var(--muted);margin-right:3px">' + _esc(r.sub) + ':' + (r.subVal||0) + '</span>';
+    } else if (r.subs && Object.keys(r.subs).length) {
       subHtml = Object.entries(r.subs).filter(function(e){return e[1]>0;}).map(function(e){
         return '<span style="font-size:.68rem;padding:1px 6px;border-radius:3px;background:var(--surface2);color:var(--muted);margin-right:3px">' + _esc(e[0]) + ':' + e[1] + '</span>';
       }).join('');
@@ -8670,19 +8652,21 @@ async function ccConfirmSave() {
             ' ' + String(_d.getHours()).padStart(2,'0') + ':' + String(_d.getMinutes()).padStart(2,'0');
 
   // header + data rows
-  // เก็บ sub-location เป็น JSON string ใน 1 col — ไม่กระทบ col อื่นถ้าเพิ่ม/เปลี่ยน sub
-  var header = [['รอบตรวจนับ','ช่วงวันที่ตรวจนับ','วันที่อ้างอิง MB52','แบทช์','รหัสพัสดุ','ชื่อพัสดุ',
-                 'กอง','ชื่อกอง','SAP(กอง)','นับ(กอง)','ผลต่าง(กอง)',
-                 'sub-location (JSON)','SAP(รวม)','นับ(รวม)','ผลต่าง(รวม)',
-                 'หมายเหตุ(กอง)','หมายเหตุ(รวม)','บันทึกเมื่อ']];
+  // Long format: 1 row ต่อ code + กอง + sub-location
+  var header = [['รอบตรวจนับ','ช่วงวันที่ตรวจนับ','วันที่อ้างอิง MB52','แบทช์',
+                 'รหัสพัสดุ','ชื่อพัสดุ','กอง','ชื่อกอง',
+                 'sub-location','ยอดนับ(sub)',
+                 'SAP(กอง)','นับรวม(กอง)','ผลต่าง(กอง)','หมายเหตุ(กอง)',
+                 'SAP(รวม)','นับรวม(รวม)','ผลต่าง(รวม)','หมายเหตุ(รวม)',
+                 'บันทึกเมื่อ']];
 
   var dataRows = _ccResult.map(function(r) {
-    var subsJson = (r.subs && Object.keys(r.subs).length) ? JSON.stringify(r.subs) : '';
-    return [_ccRound, _ccDate, _ccMb52Date, r.batch, r.code, r.name,
-            r.wh, r.whName, r.sapStock, r.counted, r.diff,
-            subsJson,
-            r.sapTotal||r.sapStock, r.counted, r.diffTotal||r.diff,
-            r.note||'', r.noteTotal||'', now];
+    return [_ccRound, _ccDate, _ccMb52Date, r.batch,
+            r.code, r.name, r.wh, r.whName,
+            r.sub||'', r.subVal||0,
+            r.sapStock, r.counted, r.diff, r.note||'',
+            r.sapTotal||r.sapStock, r.cntTotal||r.counted, r.diffTotal||r.diff, r.noteTotal||'',
+            now];
   });
 
   try {
@@ -8779,41 +8763,41 @@ async function ccLoadSelectedRound() {
 
     // อ่าน header row แรก (row[0]) เพื่อ map col แบบ dynamic
     var hdrRow = existRows[0] || [];
-    // col map แบบ fixed (JSON sub format)
+    // Long format: col map จาก header row
     // [0]รอบ [1]ช่วงวันที่ [2]MB52 [3]batch [4]code [5]name
-    // [6]wh [7]whName [8]SAP(กอง) [9]นับ(กอง) [10]ผลต่าง(กอง)
-    // [11]sub-location(JSON) [12]SAP(รวม) [13]นับ(รวม) [14]ผลต่าง(รวม)
-    // [15]หมายเหตุ(กอง) [16]หมายเหตุ(รวม) [17]บันทึกเมื่อ
-    // รองรับ format เก่า (ไม่มี JSON col) ด้วย dynamic detection
-    var hdrRow0 = existRows[0] || [];
-    var ci_sub = hdrRow0.indexOf('sub-location (JSON)');
-    var ci_sapTot = ci_sub>=0 ? ci_sub+1 : 11;
-    var ci_noteLoc = ci_sub>=0 ? ci_sub+4 : -1;
-    var ci_noteTot = ci_sub>=0 ? ci_sub+5 : -1;
-
+    // [6]wh [7]whName [8]sub-location [9]ยอดนับ(sub)
+    // [10]SAP(กอง) [11]นับรวม(กอง) [12]ผลต่าง(กอง) [13]หมายเหตุ(กอง)
+    // [14]SAP(รวม) [15]นับรวม(รวม) [16]ผลต่าง(รวม) [17]หมายเหตุ(รวม)
     _ccResult = [];
+
+    // group rows by code+batch+wh เพื่อรวม sub
+    var grouped = {};
     rows.filter(function(r){ return r[0] === selRound; })
       .forEach(function(r) {
-        var subs = {};
-        if (ci_sub>=0 && r[ci_sub]) {
-          try { subs = JSON.parse(r[ci_sub])||{}; } catch(e){}
+        var key = (r[4]||'') + '||' + (r[3]||'') + '||' + (r[6]||'');
+        if (!grouped[key]) {
+          grouped[key] = {
+            code:r[4]||'', name:r[5]||'', batch:r[3]||'',
+            wh:r[6]||'', whName:r[7]||'',
+            sapStock:parseFloat(r[10])||0,
+            counted: parseFloat(r[11])||0,
+            diff:    parseFloat(r[12])||0,
+            note:    r[13]||'',
+            sapTotal:  parseFloat(r[14])||0,
+            cntTotal:  parseFloat(r[15])||0,
+            diffTotal: parseFloat(r[16])||0,
+            noteTotal: r[17]||'',
+            subs:{}
+          };
         }
-        _ccResult.push({
-          code:      r[4]||'',
-          name:      r[5]||'',
-          batch:     r[3]||'',
-          wh:        r[6]||'',
-          whName:    r[7]||'',
-          sapStock:  parseFloat(r[8])||0,
-          counted:   parseFloat(r[9])||0,
-          diff:      parseFloat(r[10])||0,
-          sapTotal:  parseFloat(r[ci_sapTot])||0,
-          diffTotal: parseFloat(r[ci_sapTot+2])||0,
-          note:      ci_noteLoc>=0 ? r[ci_noteLoc]||'' : '',
-          noteTotal: ci_noteTot>=0 ? r[ci_noteTot]||'' : '',
-          subs:      subs
-        });
+        var sub = r[8]||'';
+        var subVal = parseFloat(r[9])||0;
+        if (sub && subVal) grouped[key].subs[sub] = subVal;
       });
+
+    Object.values(grouped).forEach(function(g) {
+      _ccResult.push(g);
+    });
 
     if (!_ccResult.length) { showToast('ไม่พบข้อมูลรอบนี้', true); return; }
     _ccRound = selRound;
