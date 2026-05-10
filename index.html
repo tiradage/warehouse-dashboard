@@ -268,7 +268,13 @@ window.loadCloudData = async function(){
         invData = invData.map(d=>{
           const k = d.code+'||'+(d.batch||'');
           const wh = whRaw[k];
-          return wh ? {...d, whStock:wh.whStock||{}, whValue:wh.whValue||{}} : {...d, whStock:{}, whValue:{}};
+          if(wh){
+            // rebuild warehouses จาก whStock keys ใหม่ (ไม่ใช้ค่าเก่าจาก Firebase)
+            const newWhs = Object.keys(wh.whStock||{}).filter(Boolean).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+            return {...d, whStock:wh.whStock||{}, whValue:wh.whValue||{},
+                    warehouses: newWhs.join(', ')};
+          }
+          return {...d, whStock:{}, whValue:{}, warehouses:''};
         });
       }
       // rebuild mb52StockMap
