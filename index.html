@@ -8242,8 +8242,30 @@ function ccHandleUpload(event) {
         var ws = wb.Sheets['แบทช'+batch] || wb.Sheets['แบทช์'+batch];
         if (!ws) return;
 
-        var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:true});
         if (rows.length < 4) return;
+
+        // สร้าง merged cell map — cell ใน merged range ให้ได้ค่าจาก top-left เสมอ
+        // และ cell ที่ไม่ใช่ top-left จะได้ '' จาก sheet_to_json → ต้อง fill ด้วย
+        var mergeMap = {}; // 'R{row}C{col}' -> value จาก top-left
+        if (ws['!merges']) {
+          ws['!merges'].forEach(function(m) {
+            var topCell = ws[XLSX.utils.encode_cell({r:m.s.r, c:m.s.c})];
+            var topVal  = topCell ? (topCell.v !== undefined ? topCell.v : '') : '';
+            for (var r2=m.s.r; r2<=m.e.r; r2++) {
+              for (var c2=m.s.c; c2<=m.e.c; c2++) {
+                mergeMap['R'+r2+'C'+c2] = topVal;
+              }
+            }
+          });
+        }
+        // helper: อ่านค่า cell โดยตรง พร้อม merged fill
+        function cellVal(rowIdx, colIdx) {
+          var key = 'R'+rowIdx+'C'+colIdx;
+          if (key in mergeMap) return mergeMap[key];
+          var cell = ws[XLSX.utils.encode_cell({r:rowIdx, c:colIdx})];
+          return cell ? (cell.v !== undefined ? cell.v : '') : '';
+        }
 
         var hdr2 = rows[1]; // group header
         var hdr3 = rows[2]; // detail header
@@ -8280,29 +8302,27 @@ function ccHandleUpload(event) {
 
         // parse data rows
         for (var ri = 3; ri < rows.length; ri++) {
-          var row = rows[ri];
-          var code = String(row[0]||'').trim();
+          var row   = rows[ri];
+          var code  = String(cellVal(ri, 0)||'').trim();
           if (!code || !code.startsWith('100')) continue;
           var name     = String(row[1]||'').trim();
-          var sapTotal = parseFloat(row[3])||0;
-          var cntTotal  = totalCntCi  >= 0 ? parseFloat(row[totalCntCi]) ||0 : 0;
-          var diffTotal = totalDiffCi >= 0 ? parseFloat(row[totalDiffCi])||0 : 0;
-          var noteTotal = totalNoteCi >= 0 ? String(row[totalNoteCi]||'').trim() : '';
-        if(noteTotal && code==='1000010001') console.log('[DEBUG noteTotal] code='+code+' ci='+totalNoteCi+' val='+noteTotal.substring(0,40));
+          var sapTotal  = parseFloat(cellVal(ri, 3))||0;
+          var cntTotal  = totalCntCi  >= 0 ? parseFloat(cellVal(ri, totalCntCi)) ||0 : 0;
+          var diffTotal = totalDiffCi >= 0 ? parseFloat(cellVal(ri, totalDiffCi))||0 : 0;
+          var noteTotal = totalNoteCi >= 0 ? String(cellVal(ri, totalNoteCi)||'').trim() : '';
+
 
           // รวม per loc
           var locs = {};
           colMap.forEach(function(cm) {
             if (!cm.locId) return;
             if (!locs[cm.locId]) locs[cm.locId] = {name:cm.locName||'', sap:0, cnt:0, diff:0, note:'', subs:{}};
-            var val = row[cm.ci];
+            // อ่าน cell โดยตรงเพื่อหลีกเลี่ยง merged cell ปนกัน
+            var val = cellVal(ri, cm.ci);
             if (cm.type==='sap')  locs[cm.locId].sap  = parseFloat(val)||0;
             if (cm.type==='cnt')  locs[cm.locId].cnt  = parseFloat(val)||0;
             if (cm.type==='diff') locs[cm.locId].diff = parseFloat(val)||0;
-            if (cm.type==='note') {
-              locs[cm.locId].note = String(val||'').trim();
-              if(locs[cm.locId].note) console.log('[DEBUG note] code='+code+' loc='+cm.locId+' ci='+cm.ci+' note='+locs[cm.locId].note.substring(0,40));
-            }
+            if (cm.type==='note') locs[cm.locId].note = String(val||'').trim();
             if (cm.type==='sub') {
               var sv = parseFloat(val)||0;
               if (sv) locs[cm.locId].subs[cm.subName] = sv;
@@ -8495,7 +8515,14 @@ function _ccGroupByCodeBatchLoc(rows) {
   rows.forEach(function(r) {
     var key = r.code + '||' + r.batch;
     // ใช้ note(กอง) เฉพาะ — ถ้า note เหมือน noteTotal แสดงว่า JS อ่านผิด ให้ใช้ ''
-    var locNote = (r.note && r.noteTotal && r.note === r.noteTotal) ? '' : (r.note || '');
+    // ตัด noteTotal ออกจาก note(กอง) เพื่อไม่ให้แสดงซ้ำ
+    var locNote = r.note || '';
+    if (locNote && r.noteTotal && locNote.indexOf(r.noteTotal) >= 0) {
+      locNote = locNote.replace(r.noteTotal, '').trim();
+    }
+    if (r.noteTotal && locNote.indexOf(r.noteTotal.substring(0,10)) >= 0) {
+      locNote = '';
+    }
     if (!grouped[key]) {
       order.push(key);
       grouped[key] = {
