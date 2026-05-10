@@ -8305,29 +8305,19 @@ function ccHandleUpload(event) {
             }
           });
 
-          // สร้าง _ccResult (long format)
+          // สร้าง _ccResult — 1 entry ต่อ code+กอง (subs รวมไว้ใน object)
           Object.keys(locs).forEach(function(locId) {
-            var loc  = locs[locId];
-            var subs = loc.subs;
-            if (Object.keys(subs).length > 0) {
-              Object.keys(subs).forEach(function(subName) {
-                _ccResult.push({
-                  code:code, name:nameMap[code]||name, batch:batch,
-                  wh:locId, whName:loc.name,
-                  sub:subName, subVal:subs[subName],
-                  sapStock:loc.sap, counted:loc.cnt, diff:loc.diff, note:loc.note,
-                  sapTotal:sapTotal, cntTotal:cntTotal, diffTotal:diffTotal, noteTotal:noteTotal
-                });
-              });
-            } else {
-              _ccResult.push({
-                code:code, name:nameMap[code]||name, batch:batch,
-                wh:locId, whName:loc.name,
-                sub:'', subVal:0,
-                sapStock:loc.sap, counted:loc.cnt, diff:loc.diff, note:loc.note,
-                sapTotal:sapTotal, cntTotal:cntTotal, diffTotal:diffTotal, noteTotal:noteTotal
-              });
-            }
+            var loc = locs[locId];
+            _ccResult.push({
+              code:code, name:nameMap[code]||name, batch:batch,
+              wh:locId, whName:loc.name,
+              sapStock:loc.sap, counted:loc.cnt, diff:loc.diff, note:loc.note,
+              sapTotal:sapTotal, cntTotal:cntTotal, diffTotal:diffTotal, noteTotal:noteTotal,
+              subs:loc.subs,
+              // sub/subVal สำหรับ backward compat กับ save
+              sub: Object.keys(loc.subs).length===1 ? Object.keys(loc.subs)[0] : '',
+              subVal: Object.keys(loc.subs).length===1 ? Object.values(loc.subs)[0] : 0
+            });
           });
         }
       });
@@ -8418,10 +8408,8 @@ function ccRenderResult() {
 
     // sub-location badge
     var subHtml = '';
-    // แสดง sub จาก r.sub + r.subVal (long format)
-    if (r.sub) {
-      subHtml = '<span style="font-size:.68rem;padding:1px 6px;border-radius:3px;background:var(--surface2);color:var(--muted);margin-right:3px">' + _esc(r.sub) + ':' + (r.subVal||0) + '</span>';
-    } else if (r.subs && Object.keys(r.subs).length) {
+    // แสดง sub จาก r.subs
+    if (r.subs && Object.keys(r.subs).length) {
       subHtml = Object.entries(r.subs).filter(function(e){return e[1]>0;}).map(function(e){
         return '<span style="font-size:.68rem;padding:1px 6px;border-radius:3px;background:var(--surface2);color:var(--muted);margin-right:3px">' + _esc(e[0]) + ':' + e[1] + '</span>';
       }).join('');
@@ -8792,13 +8780,18 @@ async function ccConfirmSave() {
                  'SAP(รวม)','นับรวม(รวม)','ผลต่าง(รวม)','หมายเหตุ(รวม)',
                  'บันทึกเมื่อ']];
 
-  var dataRows = _ccResult.map(function(r) {
-    return [_ccRound, _ccDate, _ccMb52Date, r.batch,
-            r.code, r.name, r.wh, r.whName,
-            r.sub||'', r.subVal||0,
-            r.sapStock, r.counted, r.diff, r.note||'',
-            r.sapTotal||r.sapStock, r.cntTotal||r.counted, r.diffTotal||r.diff, r.noteTotal||'',
-            now];
+  // บันทึก long format: 1 row ต่อ code+กอง+sub
+  var dataRows = [];
+  _ccResult.forEach(function(r) {
+    var subs = r.subs && Object.keys(r.subs).length ? r.subs : {'': 0};
+    Object.keys(subs).forEach(function(sub) {
+      dataRows.push([_ccRound, _ccDate, _ccMb52Date, r.batch,
+        r.code, r.name, r.wh, r.whName,
+        sub, subs[sub],
+        r.sapStock, r.counted, r.diff, r.note||'',
+        r.sapTotal||r.sapStock, r.cntTotal||r.counted, r.diffTotal||r.diff, r.noteTotal||'',
+        now]);
+    });
   });
 
   try {
