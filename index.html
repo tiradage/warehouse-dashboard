@@ -8894,36 +8894,58 @@ async function ccLoadSelectedRound() {
     // [6]wh [7]whName [8]sub-location [9]ยอดนับ(sub)
     // [10]SAP(กอง) [11]นับรวม(กอง) [12]ผลต่าง(กอง) [13]หมายเหตุ(กอง)
     // [14]SAP(รวม) [15]นับรวม(รวม) [16]ผลต่าง(รวม) [17]หมายเหตุ(รวม)
-    _ccResult = [];
+    // อ่าน header แบบ dynamic — map col จาก header row
+    var hdrLoad = existRows[0] || [];
+    var lci = {batch:3,code:4,name:5,wh:6,whName:7,sub:8,subVal:9,
+               sap:10,cnt:11,diff:12,note:13,sapTot:14,cntTot:15,diffTot:16,noteTot:17};
+    hdrLoad.forEach(function(h,i){
+      var hn = String(h||'').trim();
+      if (hn==='แบทช์')             lci.batch=i;
+      else if (hn==='รหัสพัสดุ')    lci.code=i;
+      else if (hn==='ชื่อพัสดุ')    lci.name=i;
+      else if (hn==='กอง')          lci.wh=i;
+      else if (hn==='ชื่อกอง')      lci.whName=i;
+      else if (hn==='sub-location')  lci.sub=i;
+      else if (hn==='ยอดนับ(sub)')   lci.subVal=i;
+      else if (hn==='SAP(กอง)')      lci.sap=i;
+      else if (hn==='นับรวม(กอง)')   lci.cnt=i;
+      else if (hn==='ผลต่าง(กอง)')   lci.diff=i;
+      else if (hn==='หมายเหตุ(กอง)') lci.note=i;
+      else if (hn==='SAP(รวม)')      lci.sapTot=i;
+      else if (hn==='นับรวม(รวม)')   lci.cntTot=i;
+      else if (hn==='ผลต่าง(รวม)')   lci.diffTot=i;
+      else if (hn==='หมายเหตุ(รวม)') lci.noteTot=i;
+    });
 
-    // group rows by code+batch+wh เพื่อรวม sub
+    _ccResult = [];
     var grouped = {};
     rows.filter(function(r){ return r[0] === selRound; })
       .forEach(function(r) {
-        var key = (r[4]||'') + '||' + (r[3]||'') + '||' + (r[6]||'');
+        var key = (r[lci.code]||'') + '||' + (r[lci.batch]||'') + '||' + (r[lci.wh]||'');
         if (!grouped[key]) {
           grouped[key] = {
-            code:r[4]||'', name:r[5]||'', batch:r[3]||'',
-            wh:r[6]||'', whName:r[7]||'',
-            sapStock:parseFloat(r[10])||0,
-            counted: parseFloat(r[11])||0,
-            diff:    parseFloat(r[12])||0,
-            note:    r[13]||'',
-            sapTotal:  parseFloat(r[14])||0,
-            cntTotal:  parseFloat(r[15])||0,
-            diffTotal: parseFloat(r[16])||0,
-            noteTotal: r[17]||'',
+            code:     r[lci.code]||'',
+            name:     r[lci.name]||'',
+            batch:    r[lci.batch]||'',
+            wh:       r[lci.wh]||'',
+            whName:   r[lci.whName]||'',
+            sapStock: parseFloat(r[lci.sap])||0,
+            counted:  parseFloat(r[lci.cnt])||0,
+            diff:     parseFloat(r[lci.diff])||0,
+            note:     r[lci.note]||'',
+            sapTotal: parseFloat(r[lci.sapTot])||0,
+            cntTotal: parseFloat(r[lci.cntTot])||0,
+            diffTotal:parseFloat(r[lci.diffTot])||0,
+            noteTotal:r[lci.noteTot]||'',
             subs:{}
           };
         }
-        var sub = r[8]||'';
-        var subVal = parseFloat(r[9])||0;
+        var sub    = r[lci.sub]||'';
+        var subVal = parseFloat(r[lci.subVal])||0;
         if (sub && subVal) grouped[key].subs[sub] = subVal;
       });
 
-    Object.values(grouped).forEach(function(g) {
-      _ccResult.push(g);
-    });
+    Object.values(grouped).forEach(function(g){ _ccResult.push(g); });
 
     if (!_ccResult.length) { showToast('ไม่พบข้อมูลรอบนี้', true); return; }
     _ccRound = selRound;
