@@ -8288,6 +8288,7 @@ function ccHandleUpload(event) {
           var cntTotal  = totalCntCi  >= 0 ? parseFloat(row[totalCntCi]) ||0 : 0;
           var diffTotal = totalDiffCi >= 0 ? parseFloat(row[totalDiffCi])||0 : 0;
           var noteTotal = totalNoteCi >= 0 ? String(row[totalNoteCi]||'').trim() : '';
+        if(noteTotal && code==='1000010001') console.log('[DEBUG noteTotal] code='+code+' ci='+totalNoteCi+' val='+noteTotal.substring(0,40));
 
           // รวม per loc
           var locs = {};
@@ -8298,7 +8299,10 @@ function ccHandleUpload(event) {
             if (cm.type==='sap')  locs[cm.locId].sap  = parseFloat(val)||0;
             if (cm.type==='cnt')  locs[cm.locId].cnt  = parseFloat(val)||0;
             if (cm.type==='diff') locs[cm.locId].diff = parseFloat(val)||0;
-            if (cm.type==='note') locs[cm.locId].note = String(val||'').trim();
+            if (cm.type==='note') {
+              locs[cm.locId].note = String(val||'').trim();
+              if(locs[cm.locId].note) console.log('[DEBUG note] code='+code+' loc='+cm.locId+' ci='+cm.ci+' note='+locs[cm.locId].note.substring(0,40));
+            }
             if (cm.type==='sub') {
               var sv = parseFloat(val)||0;
               if (sv) locs[cm.locId].subs[cm.subName] = sv;
@@ -8485,10 +8489,13 @@ function _ccGroupByCodeBatch(rows) {
 
 function _ccGroupByCodeBatchLoc(rows) {
   // Group by code+batch — เอาข้อมูลต่อกอง (SAP(กอง), นับรวม(กอง))
+  // note = หมายเหตุ(กอง) เท่านั้น ไม่รวม noteTotal
   var grouped = {};
   var order = [];
   rows.forEach(function(r) {
     var key = r.code + '||' + r.batch;
+    // ใช้ note(กอง) เฉพาะ — ถ้า note เหมือน noteTotal แสดงว่า JS อ่านผิด ให้ใช้ ''
+    var locNote = (r.note && r.noteTotal && r.note === r.noteTotal) ? '' : (r.note || '');
     if (!grouped[key]) {
       order.push(key);
       grouped[key] = {
@@ -8496,12 +8503,16 @@ function _ccGroupByCodeBatchLoc(rows) {
         sap: r.sapStock,
         cnt: r.counted,
         diff: r.diff,
-        note: r.note || '',
+        note: locNote,
         subs: {}
       };
+    } else if (!grouped[key].note && locNote) {
+      grouped[key].note = locNote;
     }
-    if (r.sub && r.subVal) {
-      grouped[key].subs[r.sub] = (grouped[key].subs[r.sub]||0) + r.subVal;
+    if (r.subs) {
+      Object.keys(r.subs).forEach(function(s) {
+        grouped[key].subs[s] = (grouped[key].subs[s]||0) + r.subs[s];
+      });
     }
   });
   return order.map(function(k){ return grouped[k]; });
