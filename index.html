@@ -8251,10 +8251,8 @@ function ccHandleUpload(event) {
         var colMap = [];
         var curLocId = null, curLocName = null;
         for (var ci = 4; ci < hdr2.length; ci++) {
-          var h2 = String(hdr2[ci]||'').replace(/[
-]+/g,'').trim();
-          var h3 = String(hdr3[ci]||'').replace(/[
-]+/g,'').trim();
+          var h2 = String(hdr2[ci]||'').replace(/[\r\n]+/g,'').trim();
+          var h3 = String(hdr3[ci]||'').replace(/[\r\n]+/g,'').trim();
 
           if (h2 && h2 !== 'สรุปรวม') {
             var parts = h2.split(/\s+/);
