@@ -3667,7 +3667,12 @@ function buildInvFilters(){
   invData.forEach(r=>{
     if(r.warehouses) r.warehouses.split(',').forEach(w=>{ if(w.trim()) whs.add(w.trim()); });
     if(r.unit) units.add(r.unit);
-    if(r.batch!==undefined) batches.add(r.batch);
+    // normalize batch — เก็บเฉพาะ N หรือ R
+    if(r.batch!==undefined){
+      var b=String(r.batch).trim();
+      var bn=b===''?'N':b==='N'?'N':b==='R'?'R':b.startsWith('N')?'N':b.startsWith('R')?'R':'N';
+      batches.add(bn);
+    }
   });
   buildMsList('wh', whs);
   buildMsList('batch', batches);
@@ -8452,7 +8457,9 @@ function ccPrintPDF() {
     allRows.forEach(function(r){ if(r.wh===selLocId) locName=r.whName; });
     var locRows = allRows.filter(function(r){ return r.wh === selLocId; });
     console.log('[PDF] selLocId='+selLocId+' allRows='+allRows.length+' locRows='+locRows.length);
-    if(locRows.length>0) console.log('[PDF] locRows[0] wh='+locRows[0].wh+' note='+String(locRows[0].note||'').substring(0,40));
+    locRows.slice(0,5).forEach(function(r,i){ 
+      console.log('[PDF row'+i+'] code='+r.code+' wh='+r.wh+' batch='+r.batch+' note='+String(r.note||'').substring(0,50)+' noteTotal='+String(r.noteTotal||'').substring(0,30)); 
+    });
     _ccGeneratePDF(locRows, selLocId + ' ' + locName, false, selLocId);
   } else {
     // PDF รวมทุกกอง — group by code+batch
