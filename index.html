@@ -3952,7 +3952,10 @@ function renderPr(){
       ${ie('poNo',r.poNo,'text')}
       ${ie('poDate',r.poDate,'date')}
       <td class="mono" style="font-size:.74rem;color:var(--muted)">${r.itemCode||'–'}</td>
-      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;font-weight:500">${r.itemName||'–'}${r._me2n104Alert?'<span title="103=รับแล้ว แต่ยังไม่อัปเดต 105" style="margin-left:6px;cursor:help;color:var(--accent3)">⚠105</span>':''}</td>
+      <td style="font-weight:500">
+        <div style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.itemName||'–'}</div>
+        ${r._me2n104Alert?'<div style="margin-top:2px"><span title="103=รับแล้ว แต่ยังไม่อัปเดต 105" style="display:inline-block;padding:1px 7px;border-radius:4px;background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.4);color:var(--accent3);font-size:.72rem;font-weight:700;cursor:help">⚠ ต้องอัปเดต 105</span></div>':''}
+      </td>
       <td class="mono">${r.qty||'–'}</td>
       <td class="mono" style="text-align:right">${r.deliveryDays||'–'}</td>
       <td class="mono">${(function(){var d=r.dueDate||calcDueDate(r.poDate,r.deliveryDays);return d||'–';})()}</td>
@@ -7403,6 +7406,17 @@ function renderRecommend(){
         '<span style="font-size:.7rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis" title="'+esc(bdPO)+'">'+esc(bdPO.substring(0,30))+'</span>'+
       '</div>');
     }
+    // รอรับ 105 (103=รับแล้ว, 105=รอรับ)
+    var pr105=r.prList.filter(function(p){return p.s103==='รับแล้ว'&&p.s105==='รอรับ';});
+    if(pr105.length){
+      var sum105=pr105.reduce(function(s,p){return s+parseFloat(String(p.qty||0).replace(/,/g,''));},0);
+      var bd105=[...new Set(pr105.map(function(p){return p.budget||'–';}).filter(Boolean))].join(', ');
+      procureLines.push('<div style="display:flex;gap:6px;align-items:baseline;margin-bottom:3px">'+
+        '<span style="font-size:.7rem;padding:1px 6px;border-radius:3px;background:rgba(96,165,250,.12);color:var(--blue);white-space:nowrap;flex-shrink:0">รอรับ 105</span>'+
+        '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:.78rem;font-weight:600">'+Math.round(sum105).toLocaleString()+'</span>'+
+        '<span style="font-size:.7rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis" title="'+esc(bd105)+'">'+esc(bd105.substring(0,30))+'</span>'+
+      '</div>');
+    }
     // ME2N
     if(r.me2n>0){
       procureLines.push('<div style="display:flex;gap:6px;align-items:baseline;margin-bottom:3px">'+
@@ -7515,11 +7529,12 @@ function _previewMe2n103K04(k04Rows){
     const prNo = String(r['ใบขอเสนอซื้อ']||'').trim();
     const poDate = toDateStr(r['วันที่เอกสาร']);
     const code = String(r['วัสดุ']||'').replace(/-/g,'').trim();
+    const vendor = String(r['ผู้ขาย/โรงงานผู้จัดหาวัสดุ']||r['Vendor']||'').trim();
     if(!prNo||!poNo||!code) return;
     // หา prData row ที่ตรงกัน
     prData.forEach(function(d){
       if(d.prNo===prNo && d.itemCode===code){
-        matches.push({prNo, code, itemName:d.itemName||'', poNoNew:poNo, poDateNew:poDate, poNoOld:d.poNo||'–', prDataId:d.id, rowRef:d});
+        matches.push({prNo, code, itemName:d.itemName||'', poNoNew:poNo, poDateNew:poDate, poNoOld:d.poNo||'–', vendor:vendor, prDataId:d.id, rowRef:d});
       }
     });
   });
@@ -7560,14 +7575,16 @@ function _showMe2nPreviewModal(fileType, items, alertItems){
         <th style="padding:7px 10px;text-align:left">PO No. เดิม</th>
         <th style="padding:7px 10px;text-align:left;color:var(--accent)">PO No. ใหม่</th>
         <th style="padding:7px 10px;text-align:left;color:var(--accent)">PO Date ใหม่</th>
+        <th style="padding:7px 10px;text-align:left;color:var(--blue)">บริษัท</th>
       </tr></thead>
       <tbody>${items.map(function(m){return '<tr style="border-bottom:1px solid var(--border)">'+
         '<td style="padding:6px 10px;font-family:monospace">'+esc(m.prNo)+'</td>'+
         '<td style="padding:6px 10px;font-family:monospace;color:var(--accent)">'+esc(m.code)+'</td>'+
-        '<td style="padding:6px 10px;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+esc(m.itemName)+'</td>'+
+        '<td style="padding:6px 10px;max-width:180px;overflow:hidden;text-overflow:ellipsis">'+esc(m.itemName)+'</td>'+
         '<td style="padding:6px 10px;color:var(--muted)">'+esc(m.poNoOld||'–')+'</td>'+
         '<td style="padding:6px 10px;font-weight:600;color:var(--accent)">'+esc(m.poNoNew)+'</td>'+
         '<td style="padding:6px 10px;color:var(--accent3)">'+esc(m.poDateNew)+'</td>'+
+        '<td style="padding:6px 10px;font-size:.78rem;color:var(--blue)">'+esc(m.vendor||'–')+'</td>'+
       '</tr>';}).join('')}</tbody>
     </table></div>`;
   } else {
@@ -7618,9 +7635,14 @@ async function _confirmMe2n103Update(items){
         const rPrNo=String(sheetRows[i][2]||'').trim();
         const rCode=String(sheetRows[i][7]||'').replace(/-/g,'').trim();
         if(rPrNo===m.prNo && rCode===m.code){
-          await sheetsUpdate(`ขอซื้อ!D${i+1}:E${i+1}`,[[m.poDateNew, m.poNoNew]]);
+          // บันทึก vendor ลง col บริษัท (col S = index 18) ถ้ามีค่า
+          if(m.vendor) {
+            await sheetsUpdate(`ขอซื้อ!D${i+1}:E${i+1}`,[[m.poDateNew, m.poNoNew]]);
+          } else {
+            await sheetsUpdate(`ขอซื้อ!D${i+1}:E${i+1}`,[[m.poDateNew, m.poNoNew]]);
+          }
           // update local prData
-          if(m.rowRef){ m.rowRef.poDate=m.poDateNew; m.rowRef.poNo=m.poNoNew; }
+          if(m.rowRef){ m.rowRef.poDate=m.poDateNew; m.rowRef.poNo=m.poNoNew; if(m.vendor) m.rowRef.vendor=m.vendor; }
           updated++;
           break;
         }
