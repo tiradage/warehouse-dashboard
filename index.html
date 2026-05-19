@@ -7480,11 +7480,11 @@ function renderRecommend(){
 }
 
 // ══ Lock List Upload ═══════════════════════════════════════════
-function handleLockListUpload(event) {
+async function handleLockListUpload(event) {
   var file = event.target.files[0];
   if (!file) return;
   var reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = async function(e) {
     try {
       var wb = XLSX.read(e.target.result, {type:'array'});
       var lockMap = {};
