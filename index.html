@@ -298,6 +298,7 @@ window.loadCloudData = async function(){
     if(typeof syncAll==='function') setTimeout(function(){syncAll();},400);
     if(window.loadMb51Cloud) window.loadMb51Cloud();
     if(window.loadMe2nCloud) window.loadMe2nCloud();
+    if(window.loadLockListCloud) window.loadLockListCloud();
   }catch(e){
     window.showToast&&window.showToast('โหลด cloud ไม่สำเร็จ: '+e.message, true);
   }
@@ -2745,6 +2746,11 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
         <button onclick="exportRecommendCSV()" style="display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Sarabun',sans-serif;font-size:.82rem">
           ⬇ ส่งออก CSV
         </button>
+        <!-- Upload Lock List -->
+        <label style="display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:8px;border:1px solid rgba(251,146,60,.4);background:rgba(251,146,60,.08);color:#fb923c;cursor:pointer;font-family:'Sarabun',sans-serif;font-size:.82rem;white-space:nowrap" title="อัปโหลดไฟล์รายการเปิด/ปิดล็อก (Excel)">
+          🔒 <span id="lockListLabel">อัปโหลดรายการล็อก</span>
+          <input type="file" accept=".xlsx,.xls" style="display:none" onchange="handleLockListUpload(event)">
+        </label>
       </div>
     </div>
 
@@ -2784,16 +2790,16 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
     <!-- Table -->
     <div class="tw"><div class="ts">
       <table>
-        <thead><tr>
-          <th>รหัสพัสดุ</th>
-          <th>ชื่อพัสดุ</th>
-          <th>กลุ่มพัสดุ</th>
-          <th style="text-align:center">ความเร่งด่วน</th>
+        <thead><tr id="rcThead">
+          <th onclick="sortRc('code')" style="cursor:pointer;user-select:none">รหัสพัสดุ <span id="rcSi-code" class="si">↕</span></th>
+          <th onclick="sortRc('name')" style="cursor:pointer;user-select:none">ชื่อพัสดุ <span id="rcSi-name" class="si">↕</span></th>
+          <th onclick="sortRc('group')" style="cursor:pointer;user-select:none">กลุ่มพัสดุ <span id="rcSi-group" class="si">↕</span></th>
+          <th style="text-align:center;cursor:pointer;user-select:none" onclick="sortRc('urgency')">ความเร่งด่วน <span id="rcSi-urgency" class="si">↕</span></th>
           <th style="text-align:center">เหตุผล</th>
-          <th style="text-align:right">คงคลัง</th>
-          <th style="text-align:right">avg/เดือน</th>
-          <th style="text-align:right">ใช้ได้ (เดือน)</th>
-          <th style="text-align:right">ความต้องการ</th>
+          <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortRc('stock')">คงคลัง <span id="rcSi-stock" class="si">↕</span></th>
+          <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortRc('avg')">avg/เดือน <span id="rcSi-avg" class="si">↕</span></th>
+          <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortRc('ml')">ใช้ได้ (เดือน) <span id="rcSi-ml" class="si">↕</span></th>
+          <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortRc('demand')">ความต้องการ <span id="rcSi-demand" class="si">↕</span></th>
           <th>การจัดหาที่มีอยู่แล้ว</th>
         </tr></thead>
         <tbody id="rcBody"><tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">กด "วิเคราะห์ใหม่" เพื่อเริ่มต้น</td></tr></tbody>
@@ -7198,6 +7204,14 @@ function toggleTheme(){
 
 // ══ แนะนำจัดซื้อ ══════════════════════════════════════════════
 let _rcResult = [];
+let _lockMap = {}; // code -> {locked:bool, source:'หลัก'|'รอง', remark:''}
+let _rcSort = {col:'urgency', dir:1}; // col: 'code','name','group','urgency','stock','ml','demand', dir: 1=asc -1=desc
+
+function sortRc(col) {
+  if (_rcSort.col === col) { _rcSort.dir *= -1; }
+  else { _rcSort.col = col; _rcSort.dir = col === 'urgency' ? 1 : -1; }
+  renderRecommend();
+}
 
 function runRecommend(){
   // ถ้ายังไม่ได้โหลด SS — โหลดก่อนแล้ว re-run
@@ -7356,9 +7370,31 @@ function runRecommend(){
 
 function renderRecommend(){
   const q=((document.getElementById('rcSearch')||{}).value||'').toLowerCase();
-  const rows=_rcResult.filter(function(r){
+  // urgency order: วิกฤต=0, เร่งด่วนมาก=1, เร่งด่วน=2, ควรดำเนินการ=3, ติดตาม=4
+  var rows=_rcResult.filter(function(r){
     if(!q) return true;
     return r.code.toLowerCase().includes(q)||r.name.toLowerCase().includes(q);
+  });
+
+  // sort
+  rows.sort(function(a,b){
+    var va, vb, d=_rcSort.dir;
+    var col=_rcSort.col;
+    if(col==='code')    { va=a.code||''; vb=b.code||''; return d*va.localeCompare(vb); }
+    if(col==='name')    { va=a.name||''; vb=b.name||''; return d*va.localeCompare(vb,'th'); }
+    if(col==='group')   { va=a.group||''; vb=b.group||''; return d*va.localeCompare(vb,'th'); }
+    if(col==='urgency') { va=a.priority?a.priority.level:99; vb=b.priority?b.priority.level:99; return d*(va-vb); }
+    if(col==='stock')   { va=a.stock||0; vb=b.stock||0; return d*(va-vb); }
+    if(col==='avg')     { va=a.avg||0; vb=b.avg||0; return d*(va-vb); }
+    if(col==='ml')      { va=a.ml===null?9999:a.ml; vb=b.ml===null?9999:b.ml; return d*(va-vb); }
+    if(col==='demand')  { va=a.demand||0; vb=b.demand||0; return d*(va-vb); }
+    return 0;
+  });
+
+  // update sort icons
+  ['code','name','group','urgency','stock','avg','ml','demand'].forEach(function(c){
+    var el=document.getElementById('rcSi-'+c);
+    if(el) el.textContent = c===_rcSort.col ? (_rcSort.dir===1?'↑':'↓') : '↕';
   });
 
   const cnt=document.getElementById('rcCount');
@@ -7427,7 +7463,9 @@ function renderRecommend(){
     if(procureLines.length) procureHtml='<div style="min-width:200px">'+procureLines.join('')+'</div>';
 
     return '<tr>'+
-      '<td class="mono" style="font-weight:700;color:var(--accent);white-space:nowrap">'+esc(r.code)+'</td>'+
+      '<td class="mono" style="font-weight:700;color:var(--accent);white-space:nowrap">'+esc(r.code)+
+        (_lockMap[r.code]?'<br><span style="font-size:.68rem;padding:1px 6px;border-radius:3px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#ef4444;font-weight:700">🔒 ล็อก</span>':'')+
+      '</td>'+
       '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:.82rem" title="'+esc(r.name)+'">'+esc(r.name||'–')+'</td>'+
       '<td style="font-size:.75rem;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.group)+'">'+esc(r.group||'–')+'</td>'+
       '<td style="text-align:center;white-space:nowrap"><span style="font-size:.78rem;padding:3px 10px;border-radius:5px;background:rgba(0,0,0,.15);color:'+(r.priority?r.priority.color:'var(--muted)')+'";font-weight:600>'+(r.priority?r.priority.label:'–')+'</span></td>'+
@@ -7439,6 +7477,101 @@ function renderRecommend(){
       '<td>'+procureHtml+'</td>'+
     '</tr>';
   }).join('');
+}
+
+// ══ Lock List Upload ═══════════════════════════════════════════
+function handleLockListUpload(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(e.target.result, {type:'array'});
+      var lockMap = {};
+
+      // ── พัสดุหลัก ──
+      var ws1 = wb.Sheets['พัสดุหลัก'];
+      if (ws1) {
+        var rows1 = XLSX.utils.sheet_to_json(ws1, {header:1, defval:''});
+        rows1.slice(5).forEach(function(r) {
+          var code = String(r[1]||'').replace(/-/g,'').trim();
+          if (!code || isNaN(parseInt(code))) return;
+          var isLocked   = String(r[3]||'').trim(); // col D = ล็อก
+          var isUnlocked = String(r[4]||'').trim(); // col E = เปิดล็อก
+          if (isLocked && !isUnlocked) {
+            lockMap[code] = {locked:true, source:'หลัก', remark:String(r[5]||'').trim()};
+          }
+        });
+      }
+
+      // ── พัสดุรอง กฟต.2 ──
+      var ws2 = wb.Sheets['พัสดุรอง'];
+      if (ws2) {
+        var rows2 = XLSX.utils.sheet_to_json(ws2, {header:1, defval:''});
+        // หา col กฟต.2 ล็อก จาก header row3 + row5
+        var hdr3 = rows2[2] || [];
+        var hdr5 = rows2[4] || [];
+        var lockCols = [];
+        var curRegion = '';
+        hdr3.forEach(function(h, ci) {
+          if (h && String(h).trim()) curRegion = String(h).trim();
+          var h5 = String(hdr5[ci]||'').trim();
+          if (curRegion === 'กฟต.2' && h5.includes('ล็อก') && !h5.includes('เปิด')) {
+            lockCols.push(ci);
+          }
+        });
+        rows2.slice(5).forEach(function(r) {
+          var code = String(r[1]||'').replace(/-/g,'').trim();
+          if (!code || isNaN(parseInt(code))) return;
+          var isLocked = lockCols.some(function(ci) {
+            return String(r[ci]||'').trim().length > 0;
+          });
+          if (isLocked && !lockMap[code]) {
+            lockMap[code] = {locked:true, source:'รอง(กฟต.2)', remark:''};
+          }
+        });
+      }
+
+      _lockMap = lockMap;
+      var cnt = Object.keys(lockMap).length;
+
+      // บันทึกลง Firebase
+      try {
+        if (typeof setDoc !== 'undefined' && typeof doc !== 'undefined') {
+          await setDoc(doc(db, 'appData', 'lockList'), {map: lockMap, date: Date.now(), count: cnt});
+        }
+      } catch(e) { console.warn('lockList save:', e); }
+
+      // อัปเดต label
+      var lbl = document.getElementById('lockListLabel');
+      if (lbl) lbl.textContent = '🔒 ล็อก ' + cnt + ' รายการ ✓';
+
+      // วิเคราะห์ใหม่ถ้ามีข้อมูล
+      renderRecommend();
+      showToast('โหลดรายการล็อก ' + cnt + ' รายการ ✓');
+    } catch(err) {
+      showToast('อ่านไฟล์ล็อกไม่สำเร็จ: ' + err.message, true);
+    }
+    event.target.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// โหลด lockMap จาก Firebase ตอน init
+async function loadLockListCloud() {
+  try {
+    if (typeof getDoc === 'undefined' || typeof doc === 'undefined') return;
+    var snap = await getDoc(doc(db, 'appData', 'lockList'));
+    if (snap.exists()) {
+      var data = snap.data();
+      if (data && data.map) {
+        _lockMap = data.map;
+        var cnt = Object.keys(_lockMap).length;
+        var lbl = document.getElementById('lockListLabel');
+        if (lbl && cnt > 0) lbl.textContent = '🔒 ล็อก ' + cnt + ' รายการ ✓';
+      }
+    }
+  } catch(e) {}
 }
 
 function exportRecommendCSV(){
