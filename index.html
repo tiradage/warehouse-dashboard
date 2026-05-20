@@ -2758,7 +2758,7 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;gap:20px;flex-wrap:wrap;align-items:center">
       <div style="font-size:.78rem;font-weight:600;color:var(--muted);white-space:nowrap">⚙ เงื่อนไข:</div>
       <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--text);cursor:pointer">
-        <input type="checkbox" id="rc1" onchange="runRecommend()" style="accent-color:var(--accent)"> ใช้ได้ &lt; 3 เดือน
+        <input type="checkbox" id="rc1" checked onchange="runRecommend()" style="accent-color:var(--accent)"> ใช้ได้ &lt; 3 เดือน
       </label>
       <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--text);cursor:pointer">
         <input type="checkbox" id="rc2a" onchange="runRecommend()" style="accent-color:var(--accent)"> คงคลัง 0021 &lt; SS0021 × 50%
@@ -2770,7 +2770,7 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
         <input type="checkbox" id="rc3" onchange="runRecommend()" style="accent-color:var(--accent)"> คงคลัง = 0 &amp; มีความต้องการ (ZMB25)
       </label>
       <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--text);cursor:pointer">
-        <input type="checkbox" id="rc4" checked onchange="runRecommend()" style="accent-color:var(--accent)"> ใช้ได้ &lt; 3 เดือน &amp; ไม่มี PR/PO
+        <input type="checkbox" id="rc4" onchange="runRecommend()" style="accent-color:var(--accent)"> ใช้ได้ &lt; 3 เดือน &amp; ไม่มี PR/PO
       </label>
       <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
         <select id="rcGroup" onchange="runRecommend()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.82rem;outline:none;min-width:160px">
@@ -7535,11 +7535,9 @@ async function handleLockListUpload(event) {
       _lockMap = lockMap;
       var cnt = Object.keys(lockMap).length;
 
-      // บันทึกลง Firebase
+      // บันทึกลง Firebase ด้วย fbSave
       try {
-        if (typeof setDoc !== 'undefined' && typeof doc !== 'undefined') {
-          await setDoc(doc(db, 'appData', 'lockList'), {map: lockMap, date: Date.now(), count: cnt});
-        }
+        await window.fbSave('lockList', {map: lockMap, date: Date.now(), count: cnt});
       } catch(e) { console.warn('lockList save:', e); }
 
       // อัปเดต label
@@ -7560,16 +7558,12 @@ async function handleLockListUpload(event) {
 // โหลด lockMap จาก Firebase ตอน init
 async function loadLockListCloud() {
   try {
-    if (typeof getDoc === 'undefined' || typeof doc === 'undefined') return;
-    var snap = await getDoc(doc(db, 'appData', 'lockList'));
-    if (snap.exists()) {
-      var data = snap.data();
-      if (data && data.map) {
-        _lockMap = data.map;
-        var cnt = Object.keys(_lockMap).length;
-        var lbl = document.getElementById('lockListLabel');
-        if (lbl && cnt > 0) lbl.textContent = '🔒 ล็อก ' + cnt + ' รายการ ✓';
-      }
+    var data = await window.fbLoad('lockList');
+    if (data && data.map) {
+      _lockMap = data.map;
+      var cnt = Object.keys(_lockMap).length;
+      var lbl = document.getElementById('lockListLabel');
+      if (lbl && cnt > 0) lbl.textContent = '🔒 ล็อก ' + cnt + ' รายการ ✓';
     }
   } catch(e) {}
 }
