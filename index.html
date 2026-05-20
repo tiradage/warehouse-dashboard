@@ -3759,7 +3759,19 @@ function filteredInv(){
 }
 
 function renderInv(){
-  const rows=filteredInv(),maxS=Math.max(...rows.map(r=>r.stock),1);
+  let rows=filteredInv();
+  // ถ้ามี text search → เรียง exact/prefix match ขึ้นก่อน
+  const _q=invFilter.text.toLowerCase().trim();
+  if(_q){
+    rows=rows.slice().sort(function(a,b){
+      var aCode=a.code.toLowerCase(), bCode=b.code.toLowerCase();
+      var aExact=(aCode===_q)?0:aCode.startsWith(_q)?1:2;
+      var bExact=(bCode===_q)?0:bCode.startsWith(_q)?1:2;
+      if(aExact!==bExact) return aExact-bExact;
+      return aCode<bCode?-1:aCode>bCode?1:0;
+    });
+  }
+  const maxS=Math.max(...rows.map(r=>r.stock),1);
   const total=rows.length,pages=Math.max(1,Math.ceil(total/PS));
   if(invPage>pages)invPage=pages;
   const sl=rows.slice((invPage-1)*PS,invPage*PS);
