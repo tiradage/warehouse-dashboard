@@ -268,6 +268,10 @@ window.loadCloudData = async function(){
         invData = invData.map(d=>{
           const k = d.code+'||'+(d.batch||'');
           const wh = whRaw[k];
+          // ถ้า stock=0 และไม่มีใน mb52StockMap → ล้าง whStock (ไม่ merge ค่าเก่า)
+          if(d.stock===0 && !(mb52StockMap && mb52StockMap[d.code])){
+            return {...d, whStock:{}, whValue:{}, warehouses:''};
+          }
           if(wh){
             // rebuild warehouses จาก whStock keys ใหม่ (ไม่ใช้ค่าเก่าจาก Firebase)
             const newWhs = Object.keys(wh.whStock||{}).filter(Boolean).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
