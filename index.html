@@ -5031,6 +5031,12 @@ function renderAddPrModal(){
       <div style="font-size:.75rem;color:var(--muted);margin-bottom:10px;font-weight:600">รายการพัสดุ</div>
       <div id="prItemsList">${itemsHtml}</div>
       <button onclick="addPrItem()" style="background:rgba(79,255,176,.1);border:1px solid rgba(79,255,176,.3);color:var(--accent);border-radius:6px;padding:5px 14px;cursor:pointer;font-family:'Sarabun',sans-serif;font-size:.8rem;margin-top:4px">+ เพิ่มรายการ</button>
+      <button onclick="togglePasteExcel()" style="background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);color:var(--blue);border-radius:6px;padding:5px 14px;cursor:pointer;font-family:'Sarabun',sans-serif;font-size:.8rem;margin-top:4px;margin-left:6px">📋 วางจาก Excel</button>
+      <div id="pasteExcelBox" style="display:none;margin-top:10px">
+        <div style="font-size:.72rem;color:var(--muted);margin-bottom:5px">วางข้อมูลจาก Excel (3 คอลัม: รหัสพัสดุ | จำนวน | ราคา/หน่วย) แต่ละแถวคั่นด้วย Tab</div>
+        <textarea id="pasteExcelText" rows="5" placeholder="วางข้อมูลจาก Excel ที่นี่...&#10;ตัวอย่าง:&#10;1000010001	5	1500&#10;1000010002	10	2000" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:.78rem;resize:vertical;box-sizing:border-box" onpaste="setTimeout(parsePasteExcel,50)"></textarea>
+        <button onclick="parsePasteExcel()" style="margin-top:6px;background:var(--blue);border:none;border-radius:6px;padding:6px 16px;color:#fff;cursor:pointer;font-family:'Sarabun',sans-serif;font-size:.8rem">✅ ใส่รายการ</button>
+      </div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button onclick="closeMoDirect()" style="padding:8px 20px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Sarabun',sans-serif">ยกเลิก</button>
@@ -5065,6 +5071,61 @@ function selectBudget(i, val){
   prItems[i].budget=val;
   const inp=document.getElementById('pr_budget_'+i); if(inp) inp.value=val;
   hideBudgetSuggest(i);
+}
+
+function togglePasteExcel(){
+  var box=document.getElementById('pasteExcelBox');
+  if(box) box.style.display=box.style.display==='none'?'block':'none';
+}
+
+function parsePasteExcel(){
+  var txt=(document.getElementById('pasteExcelText')||{}).value||'';
+  if(!txt.trim()) return;
+  // save ค่า header fields ก่อน
+  var track=(document.getElementById('pr_trackNo')||{}).value||'';
+  var prNo=(document.getElementById('pr_prNo')||{}).value||'';
+  var days=(document.getElementById('pr_deliveryDays')||{}).value||'30';
+  var date=(document.getElementById('pr_prDate')||{}).value||'';
+  var company=(document.getElementById('pr_company')||{}).value||'';
+  var note=(document.getElementById('pr_note')||{}).value||'';
+
+  var added=0;
+  txt.split('\n').forEach(function(line){
+    var cols=line.split('\t').map(function(c){return c.trim();});
+    if(cols.length<1||!cols[0]) return;
+    // normalize code — ลบ dash ออก
+    var code=cols[0].replace(/-/g,'').trim();
+    if(!code||isNaN(parseInt(code))) return;
+    var qty=cols[1]?parseFloat(cols[1].replace(/,/g,''))||'':'' ;
+    var price=cols[2]?parseFloat(cols[2].replace(/,/g,''))||0:0;
+    // หาชื่อพัสดุจาก invData
+    var inv=invData.find(function(d){return d.code===code;});
+    var name=inv?inv.name||'':'';
+    var group=inv&&groupMap[code]?groupMap[code]:'';
+    var first=prItems[0]||{};
+    prItems.push({code:code,name:name,qty:qty,price:price,budget:first.budget||'',group:group});
+    added++;
+  });
+
+  if(added>0){
+    // ลบแถวแรกที่ว่างออก (ถ้ามี)
+    if(prItems.length>added && !prItems[0].code && !prItems[0].qty){
+      prItems.splice(0,1);
+    }
+    renderAddPrModal();
+    // restore header
+    var restoreFields={pr_trackNo:track,pr_prNo:prNo,pr_deliveryDays:days,pr_prDate:date,pr_company:company,pr_note:note};
+    Object.keys(restoreFields).forEach(function(id){
+      var el=document.getElementById(id);
+      if(el) el.value=restoreFields[id];
+    });
+    // เปิด paste box กลับมา
+    var box=document.getElementById('pasteExcelBox');
+    if(box) box.style.display='block';
+    showToast('เพิ่ม '+added+' รายการจาก Excel ✓');
+  } else {
+    showToast('ไม่พบข้อมูลที่ถูกต้อง — ตรวจสอบ format', true);
+  }
 }
 
 function addPrItem(){
