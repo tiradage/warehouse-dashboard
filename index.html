@@ -253,6 +253,9 @@ window.loadCloudData = async function(){
     ]);
     if(mb52Raw){
       invData = mb52Raw.invData || [];
+      // DEBUG: ตรวจ stock ใน invData จาก Firebase
+      var _d1 = invData.find(function(d){return d.code==='1000010001'&&d.batch==='N';});
+      console.log('[FIREBASE invData] 1000010001 N stock='+(_d1?_d1.stock:'NOT FOUND')+' date='+new Date(mb52Raw.date||0).toLocaleString('th-TH'));
       // โหลด whStock จาก chunk ต่างๆ
       let whRaw = {};
       const numChunks = (whRaw_meta && whRaw_meta.chunks) ? whRaw_meta.chunks : 1;
