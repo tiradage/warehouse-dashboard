@@ -266,10 +266,6 @@ window.loadCloudData = async function(){
       } catch(e) { console.warn('whStock load error', e); }
       // สร้าง set ของ code ที่มีใน whRaw (มาจาก MB52 upload ล่าสุด)
       const whRawCodes = new Set(Object.keys(whRaw).map(k=>k.split('||')[0]));
-      // DEBUG whRaw
-      console.log('[WHRAW] total keys:', Object.keys(whRaw).length);
-      var _wr = whRaw['1040030102||N'];
-      console.log('[WHRAW] 1040030102||N:', _wr ? JSON.stringify(_wr).substring(0,150) : 'NOT FOUND');
       if(Object.keys(whRaw).length>0){
         invData = invData.map(d=>{
           const k = d.code+'||'+(d.batch||'');
@@ -301,8 +297,8 @@ window.loadCloudData = async function(){
     if(cn43nRaw){ cn43nData = cn43nRaw.status||cn43nRaw; cn43nNameMap = cn43nRaw.nameMap||{}; cn43nSuperMap = cn43nRaw.superMap||{}; }
     if(groupRaw){ groupMap = groupRaw; }
     if(zmbRaw){ zmb25Data = zmbRaw; }
+    if(mb52Raw){ buildInvFilters(); renderInv(); }
     if(cn43nRaw && zmbRaw) processZmb();
-    else if(mb52Raw){ buildInvFilters(); renderInv(); }
     if(mb52Raw||cn43nRaw||zmbRaw) window.showToast&&window.showToast('โหลดข้อมูล cloud สำเร็จ ✓');
     else window.showToast&&window.showToast('ยังไม่มีข้อมูลใน cloud — กรุณาอัปโหลดไฟล์');
     // reload SS ถ้าโหลดไปก่อน cloud load เสร็จ (ป้องกัน race condition)
