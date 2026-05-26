@@ -264,16 +264,18 @@ window.loadCloudData = async function(){
         const chunkResults = await Promise.all(chunkLoads);
         chunkResults.forEach(c=>{ if(c) Object.assign(whRaw, c); });
       } catch(e) { console.warn('whStock load error', e); }
+      // สร้าง set ของ code ที่มีใน whRaw (มาจาก MB52 upload ล่าสุด)
+      const whRawCodes = new Set(Object.keys(whRaw).map(k=>k.split('||')[0]));
       if(Object.keys(whRaw).length>0){
         invData = invData.map(d=>{
           const k = d.code+'||'+(d.batch||'');
           const wh = whRaw[k];
-          // ถ้า stock=0 และไม่มีใน mb52StockMap → ล้าง whStock (ไม่ merge ค่าเก่า)
-          if(d.stock===0 && !(mb52StockMap && mb52StockMap[d.code])){
+          // ถ้า code ไม่มีใน whRaw (ไม่อยู่ใน MB52 ล่าสุด) → ล้าง whStock
+          if(!whRawCodes.has(d.code)){
             return {...d, whStock:{}, whValue:{}, warehouses:''};
           }
           if(wh){
-            // rebuild warehouses จาก whStock keys ใหม่ (ไม่ใช้ค่าเก่าจาก Firebase)
+            // rebuild warehouses จาก whStock keys ใหม่
             const newWhs = Object.keys(wh.whStock||{}).filter(Boolean).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
             return {...d, whStock:wh.whStock||{}, whValue:wh.whValue||{},
                     warehouses: newWhs.join(', ')};
