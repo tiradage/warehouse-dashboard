@@ -7164,6 +7164,7 @@ async function fetchSafetyStock(tab){
           // ลอง whStock object ก่อน (format: {"21":qty})
           if(w.whStock){
             var v = w.whStock[wh] || w.whStock[whKey] || 0; // ลอง '0021' ก่อน แล้ว '21'
+            if(code==='1040030102') console.log('[SS DBG] code='+code+' wh='+wh+' whKey='+whKey+' whStock keys='+JSON.stringify(Object.keys(w.whStock))+' v='+v);
             stock += parseFloat(v)||0;
           }
           // ถ้า whStock ไม่มี ลอง match จาก warehouses string + stock รวม
