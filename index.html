@@ -253,9 +253,6 @@ window.loadCloudData = async function(){
     ]);
     if(mb52Raw){
       invData = mb52Raw.invData || [];
-      // DEBUG: ตรวจ stock ใน invData จาก Firebase
-      var _d1 = invData.find(function(d){return d.code==='1000010001'&&d.batch==='N';});
-      console.log('[FIREBASE invData] 1000010001 N stock='+(_d1?_d1.stock:'NOT FOUND')+' date='+new Date(mb52Raw.date||0).toLocaleString('th-TH'));
       // โหลด whStock จาก chunk ต่างๆ
       let whRaw = {};
       const numChunks = (whRaw_meta && whRaw_meta.chunks) ? whRaw_meta.chunks : 1;
@@ -269,6 +266,12 @@ window.loadCloudData = async function(){
       } catch(e) { console.warn('whStock load error', e); }
       // สร้าง set ของ code ที่มีใน whRaw (มาจาก MB52 upload ล่าสุด)
       const whRawCodes = new Set(Object.keys(whRaw).map(k=>k.split('||')[0]));
+      // DEBUG: ตรวจ whRaw stock
+      var _wr2 = whRaw['1000010001||N'];
+      if(_wr2) {
+        var _s = Object.values(_wr2.whStock||{}).reduce(function(a,b){return a+b;},0);
+        console.log('[WHRAW stock] 1000010001 N whStock sum='+_s+' keys='+JSON.stringify(Object.keys(_wr2.whStock||{})));
+      }
       if(Object.keys(whRaw).length>0){
         invData = invData.map(d=>{
           const k = d.code+'||'+(d.batch||'');
@@ -285,6 +288,7 @@ window.loadCloudData = async function(){
           }
           return {...d, whStock:{}, whValue:{}, warehouses:''};
         });
+
       }
       // rebuild mb52StockMap
       mb52StockMap = {};
