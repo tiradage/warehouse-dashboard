@@ -305,6 +305,11 @@ window.loadCloudData = async function(){
     else if(mb52Raw){ buildInvFilters(); renderInv(); }
     if(mb52Raw||cn43nRaw||zmbRaw) window.showToast&&window.showToast('โหลดข้อมูล cloud สำเร็จ ✓');
     else window.showToast&&window.showToast('ยังไม่มีข้อมูลใน cloud — กรุณาอัปโหลดไฟล์');
+    // reload SS ถ้าโหลดไปก่อน cloud load เสร็จ (ป้องกัน race condition)
+    if(mb52Raw){
+      if(_ss21Loaded){ _ss21Loaded=false; fetchSafetyStock('ss21'); }
+      if(_ss23Loaded){ _ss23Loaded=false; fetchSafetyStock('ss23'); }
+    }
     fetchBorrow();
     if(typeof syncAll==='function') setTimeout(function(){syncAll();},400);
     if(window.loadMb51Cloud) window.loadMb51Cloud();
