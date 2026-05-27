@@ -257,21 +257,17 @@ window.loadCloudData = async function(){
       let whRaw = {};
       const numChunks = (whRaw_meta && whRaw_meta.chunks) ? whRaw_meta.chunks : 1;
       try {
+        // โหลด mb52_wh เก่าก่อน (backward compat) แล้วให้ chunk ใหม่ override ทับ
+        const oldWh = await window.fbLoad('mb52_wh');
+        if(oldWh) Object.assign(whRaw, oldWh);
+        // โหลด chunk ใหม่ (override ค่าเก่า)
         const chunkLoads = [];
         for(let ci=0; ci<numChunks; ci++) chunkLoads.push(window.fbLoad('mb52_wh_'+ci));
-        // ลอง load mb52_wh เก่าด้วย (backward compat)
-        chunkLoads.push(window.fbLoad('mb52_wh'));
         const chunkResults = await Promise.all(chunkLoads);
         chunkResults.forEach(c=>{ if(c) Object.assign(whRaw, c); });
       } catch(e) { console.warn('whStock load error', e); }
       // สร้าง set ของ code ที่มีใน whRaw (มาจาก MB52 upload ล่าสุด)
       const whRawCodes = new Set(Object.keys(whRaw).map(k=>k.split('||')[0]));
-      // DEBUG: ตรวจ whRaw stock
-      var _wr2 = whRaw['1000010001||N'];
-      if(_wr2) {
-        var _s = Object.values(_wr2.whStock||{}).reduce(function(a,b){return a+b;},0);
-        console.log('[WHRAW stock] 1000010001 N whStock sum='+_s+' keys='+JSON.stringify(Object.keys(_wr2.whStock||{})));
-      }
       if(Object.keys(whRaw).length>0){
         invData = invData.map(d=>{
           const k = d.code+'||'+(d.batch||'');
