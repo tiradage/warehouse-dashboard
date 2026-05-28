@@ -308,6 +308,7 @@ window.loadCloudData = async function(){
     if(mb52Raw){
       if(_ss21Loaded){ _ss21Loaded=false; fetchSafetyStock('ss21'); }
       if(_ss23Loaded){ _ss23Loaded=false; fetchSafetyStock('ss23'); }
+      if(_ss6005Loaded){ _ss6005Loaded=false; fetchSafetyStock('ss6005'); }
     }
     fetchBorrow();
     if(typeof syncAll==='function') setTimeout(function(){syncAll();},400);
@@ -1893,6 +1894,7 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
         <button class="tab-dd-item" data-tab="concrete_count" onclick="pickTabGroup('concrete_count','stock')"><span class="dd-dot"></span>📋 ตรวจนับคอนกรีต</button>
         <button class="tab-dd-item" data-tab="ss21" onclick="pickTabGroup('ss21','stock')"><span class="dd-dot"></span>📊 Safety Stock 0021</button>
         <button class="tab-dd-item" data-tab="ss23" onclick="pickTabGroup('ss23','stock')"><span class="dd-dot"></span>📊 Safety Stock 0023</button>
+        <button class="tab-dd-item" data-tab="ss6005" onclick="pickTabGroup('ss6005','stock')"><span class="dd-dot"></span>⚡ Safety Stock 6005</button>
       </div>
     </div>
 
@@ -2504,6 +2506,56 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
     <div class="pag"><span id="ss23Pi"></span><div class="pbtns" id="ss23Pbtns"></div></div>
     </div>
   </div>
+  <!-- ══ TAB: Safety Stock 6005 (33kV / 115kV) ══ -->
+  <div class="tab-panel" id="tab-ss6005">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <div>
+        <div class="sec-title" style="margin-bottom:2px">⚡ Safety Stock — คลัง 6005 (สายส่ง)</div>
+        <div style="font-size:.78rem;color:var(--muted)">เปรียบเทียบ Safety Stock กับคงคลัง MB52 (6005) — ระบบ 33 kV และ 115 kV</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="ss6005Search" placeholder="🔍 ค้นหารหัส / ชื่อ..." oninput="debounce(function(){renderSafetyStock('ss6005')})()"
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.83rem;outline:none;min-width:200px">
+        <select id="ss6005System" onchange="renderSafetyStock('ss6005')"
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.83rem;outline:none">
+          <option value="">ทุกระบบ</option>
+          <option value="33 kV">⚡ 33 kV</option>
+          <option value="115 kV">⚡ 115 kV</option>
+        </select>
+        <select id="ss6005Group" onchange="renderSafetyStock('ss6005')"
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.83rem;outline:none">
+          <option value="">ทุกกลุ่ม</option>
+        </select>
+        <select id="ss6005Rec" onchange="renderSafetyStock('ss6005')"
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.83rem;outline:none">
+          <option value="">ทุกคำแนะนำ</option>
+          <option value="จัดซื้อ">🛒 จัดซื้อ</option>
+          <option value="-">✅ เพียงพอ</option>
+        </select>
+      </div>
+    </div>
+    <div class="stats" id="ss6005Stats" style="margin-bottom:16px"></div>
+    <div class="tw"><div class="ts">
+      <table>
+        <thead><tr>
+          <th data-tbl="ss6005" data-col="code">รหัสวัสดุ <span class="si">↕</span></th>
+          <th data-tbl="ss6005" data-col="name">ชื่อพัสดุ <span class="si">↕</span></th>
+          <th data-tbl="ss6005" data-col="system" style="text-align:center">ระบบ <span class="si">↕</span></th>
+          <th data-tbl="ss6005" data-col="ss" style="text-align:right">Safety Stock <span class="si">↕</span></th>
+          <th data-tbl="ss6005" data-col="stock" style="text-align:right">คงคลัง <span class="si">↕</span></th>
+          <th data-tbl="ss6005" data-col="diff" style="text-align:right">ผลต่าง <span class="si">↕</span></th>
+          <th data-tbl="ss6005" data-col="pct" style="text-align:right">% คงคลัง <span class="si">↕</span></th>
+          <th data-tbl="ss6005" data-col="rec">แนะนำ <span class="si">↕</span></th>
+          <th data-tbl="ss6005" data-col="noPO" style="text-align:right;color:var(--accent2)">รอขึ้น PO <span class="si">↕</span></th>
+          <th data-tbl="ss6005" data-col="wait103" style="text-align:right;color:var(--accent3)">รอรับ 103 <span class="si">↕</span></th>
+          <th data-tbl="ss6005" data-col="wait105" style="text-align:right;color:var(--blue)">รอรับ 105 <span class="si">↕</span></th>
+        </tr></thead>
+        <tbody id="ss6005Body"></tbody>
+      </table>
+    </div>
+    <div class="pag"><span id="ss6005Pi"></span><div class="pbtns" id="ss6005Pbtns"></div></div>
+    </div>
+  </div>
   <!-- ══ TAB: จัดสรรพัสดุ ME2N ══ -->
   <div class="tab-panel" id="tab-me2n">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
@@ -2954,6 +3006,7 @@ function switchTab(id){
   if(id==='queue'){ if(!_queueLoaded){_queueLoaded=true;fetchQueue();}else{renderQueue();} }
   if(id==='ss21'){ if(!_ss21Loaded){_ss21Loaded=true;fetchSafetyStock('ss21');}else{renderSafetyStock('ss21');} }
   if(id==='ss23'){ if(!_ss23Loaded){_ss23Loaded=true;fetchSafetyStock('ss23');}else{renderSafetyStock('ss23');} }
+  if(id==='ss6005'){ if(!_ss6005Loaded){_ss6005Loaded=true;fetchSafetyStock('ss6005');}else{renderSafetyStock('ss6005');} }
   if(id==='me2n'){ renderMe2n(); }
   if(id==='recommend'){ runRecommend(); }
   if(id==='concrete_count'){ initConcreteCount(); }
@@ -3362,6 +3415,7 @@ async function fetchNames(){
   // re-render safety stock เพื่อให้ชื่อพัสดุอัปเดตจาก nameMap
   if(_ssData.ss21.length) renderSafetyStock('ss21');
   if(_ssData.ss23.length) renderSafetyStock('ss23');
+  if(_ssData.ss6005.length) renderSafetyStock('ss6005');
   showToast(`ดึงชื่อพัสดุสำเร็จ ${Object.keys(nameMap).length} รายการ`);
   // บันทึก groupMap ลง Firestore
   if(window.fbSave && Object.keys(groupMap).length>0) window.fbSave('groupMap', groupMap);
@@ -7268,15 +7322,15 @@ function printBorrowPDF(id){
 }
 
 // ══ Safety Stock ════════════════════════════════════════════════
-var _ssData = {ss21:[], ss23:[]};
-var _ssSort = {ss21:{col:'pct',dir:-1}, ss23:{col:'pct',dir:-1}};
-var _ssPage = {ss21:1, ss23:1};
-var _ss21Loaded=false, _ss23Loaded=false;
+var _ssData = {ss21:[], ss23:[], ss6005:[]};
+var _ssSort = {ss21:{col:'pct',dir:-1}, ss23:{col:'pct',dir:-1}, ss6005:{col:'pct',dir:-1}};
+var _ssPage = {ss21:1, ss23:1, ss6005:1};
+var _ss21Loaded=false, _ss23Loaded=false, _ss6005Loaded=false;
 var SS_PS = 50;
 
 async function fetchSafetyStock(tab){
-  var sheetName = tab==='ss21' ? 'SAFETY0021' : 'SAFETY0023';
-  var wh = tab==='ss21' ? '0021' : '0023';
+  var sheetName = tab==='ss21' ? 'SAFETY0021' : tab==='ss23' ? 'SAFETY0023' : 'SAFETY6005';
+  var wh = tab==='ss21' ? '0021' : tab==='ss23' ? '0023' : '6005';
   try{
     var url='https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_NAME_ID+'/values/'+encodeURIComponent(sheetName)+'?key='+API_KEY;
     var res=await fetch(url);
@@ -7287,11 +7341,12 @@ async function fetchSafetyStock(tab){
 
     // auto-detect header
     var hdr=rows[0].map(function(h){return String(h||'').trim().toLowerCase();});
-    var colCode=-1,colSS=-1,colName=-1;
+    var colCode=-1,colSS=-1,colName=-1,colSystem=-1;
     hdr.forEach(function(h,i){
       if(colCode<0&&(h.includes('รหัส')||h.includes('code')||h.includes('วัสดุ'))) colCode=i;
-      if(colName<0&&(h.includes('ชื่อ')||h.includes('name')||h.includes('description')||h.includes('คำอธิบาย'))) colName=i;
+      if(colName<0&&(h.includes('ชื่อ')||h.includes('name')||h.includes('description')||h.includes('คำอธิบาย')||h.includes('รายละเอียด'))) colName=i;
       if(colSS<0&&(h.includes('safety')||h.includes('ss')||h.includes('stock'))) colSS=i;
+      if(colSystem<0&&(h.includes('ระบบ')||h.includes('system')||h.includes('kv'))) colSystem=i;
     });
     if(colCode<0) colCode=0;
     if(colSS<0) colSS=hdr.length>1?1:0;
@@ -7342,19 +7397,25 @@ async function fetchSafetyStock(tab){
       var rec=pct<50&&ssVal>0?'จัดซื้อ':'-';
 
       // คำนวณ pending จาก prData เฉพาะ budget prefix ที่กำหนด
-      var budgetPrefix = tab==='ss21'?'C-':'R-';
+      var budgetPrefix = tab==='ss21'?'C-':tab==='ss23'?'R-':'';
       var prFiltered = prData.filter(function(r){
-        return String(r.itemCode||'').replace(/-/g,'').trim()===code
-          && String(r.budget||'').toUpperCase().startsWith(budgetPrefix.toUpperCase())
-          && r.s103!=='ยกเลิก' && r.s105!=='ยกเลิก';
+        var codeMatch = String(r.itemCode||'').replace(/-/g,'').trim()===code;
+        var notCancel = r.s103!=='ยกเลิก' && r.s105!=='ยกเลิก';
+        if(!codeMatch || !notCancel) return false;
+        // ss6005: ไม่กรอง budget prefix (ระบบสายส่งใช้ได้ทุก budget)
+        if(!budgetPrefix) return true;
+        return String(r.budget||'').toUpperCase().startsWith(budgetPrefix.toUpperCase());
       });
       var sumQty = function(arr){ return arr.reduce(function(a,r){ var n=parseFloat(String(r.qty||'').replace(/,/g,'')); return a+(isNaN(n)?0:n); },0); };
       var noPO   = sumQty(prFiltered.filter(function(r){return !r.poNo||r.poNo==='–'||r.poNo==='';}));
       var wait103= sumQty(prFiltered.filter(function(r){return r.poNo&&r.poNo!=='–'&&r.poNo!==''&&r.s103==='รอรับ';}));
       var wait105= sumQty(prFiltered.filter(function(r){return r.s103==='รับแล้ว'&&r.s105==='รอรับ';}));
 
+      // อ่านคอลัมน์ระบบ (สำหรับ ss6005: '33 kV' / '115 kV')
+      var system = colSystem>=0 ? String(r[colSystem]||'').trim() : '';
+
       result.push({code:code,name:name,ss:ssVal,stock:stock,diff:diff,pct:pct,rec:rec,group:group,
-        noPO:noPO,wait103:wait103,wait105:wait105});
+        noPO:noPO,wait103:wait103,wait105:wait105,system:system});
     });
     _ssData[tab]=result;
 
@@ -7377,11 +7438,14 @@ function filteredSS(tab){
   var q=(document.getElementById(tab+'Search')||{value:''}).value.trim().toLowerCase();
   var grp=(document.getElementById(tab+'Group')||{value:''}).value;
   var rec=(document.getElementById(tab+'Rec')||{value:''}).value;
+  // ss6005 มี filter ระบบ (33kV / 115kV) พิเศษ
+  var sys=(document.getElementById(tab+'System')||{value:''}).value;
   var sort=_ssSort[tab];
   var res=data.filter(function(r){
     if(q&&!r.code.includes(q)&&!(r.name||'').toLowerCase().includes(q)) return false;
     if(grp&&r.group!==grp) return false;
     if(rec&&r.rec!==rec) return false;
+    if(sys&&r.system!==sys) return false;
     return true;
   });
   res.sort(function(a,b){
@@ -7419,9 +7483,18 @@ function renderSafetyStock(tab){
     var recBadge=r.rec==='จัดซื้อ'
       ?'<span style="background:rgba(255,107,107,.15);color:var(--accent2);border:1px solid rgba(255,107,107,.4);border-radius:12px;padding:2px 10px;font-size:.76rem;font-weight:600">🛒 จัดซื้อ</span>'
       :'<span style="background:rgba(79,255,176,.1);color:var(--accent);border:1px solid rgba(79,255,176,.3);border-radius:12px;padding:2px 10px;font-size:.76rem">✅ เพียงพอ</span>';
+    // คอลัมน์ระบบ — แสดงเฉพาะ ss6005
+    var systemCell='';
+    if(tab==='ss6005'){
+      var sysColor=r.system==='115 kV'
+        ?'color:#b45309;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4)'
+        :'color:#1d4ed8;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.35)';
+      systemCell='<td style="text-align:center"><span style="'+sysColor+';border-radius:10px;padding:2px 8px;font-size:.74rem;font-weight:600;white-space:nowrap">'+(r.system||'–')+'</span></td>';
+    }
     html+='<tr>'
       +'<td class="mono" style="font-weight:600;font-size:.82rem">'+r.code+'</td>'
       +'<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;font-size:.82rem">'+( r.name||nameMap[r.code]||'–' )+'</td>'
+      +systemCell
       +'<td class="mono" style="text-align:right;font-size:.82rem">'+r.ss.toLocaleString()+'</td>'
       +'<td class="mono" style="text-align:right;font-size:.82rem">'+r.stock.toLocaleString()+'</td>'
       +'<td class="mono" style="text-align:right;color:'+diffColor+';font-weight:600;font-size:.82rem">'+(r.diff>0?'+':'')+r.diff.toLocaleString()+'</td>'
@@ -7432,7 +7505,8 @@ function renderSafetyStock(tab){
       +'<td class="mono" style="text-align:right;font-size:.82rem;color:'+(r.wait105>0?'var(--blue)':'var(--muted)')+'">'+(r.wait105>0?r.wait105.toLocaleString():'–')+'</td>'
       +'</tr>';
   }
-  bd.innerHTML=html||'<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted)">'+(_ssData[tab].length?'ไม่พบรายการที่ตรงกัน':'กำลังโหลด...')+'</td></tr>';
+  var emptyColspan = tab==='ss6005' ? '11' : '10';
+  bd.innerHTML=html||'<tr><td colspan="'+emptyColspan+'" style="text-align:center;padding:24px;color:var(--muted)">'+(_ssData[tab].length?'ไม่พบรายการที่ตรงกัน':'กำลังโหลด...')+'</td></tr>';
 
   renderPag(tab+'Pi',tab+'Pbtns',_ssPage[tab],pages,total,function(p){_ssPage[tab]=p;renderSafetyStock(tab);});
   document.querySelectorAll('th[data-tbl="'+tab+'"]').forEach(function(th){
