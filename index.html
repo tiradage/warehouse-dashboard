@@ -2834,6 +2834,9 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
         <input type="checkbox" id="rc2b" onchange="runRecommend()" style="accent-color:var(--accent)"> คงคลัง 0023 &lt; SS0023 × 50%
       </label>
       <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--text);cursor:pointer">
+        <input type="checkbox" id="rc2c" onchange="runRecommend()" style="accent-color:var(--accent)"> คงคลัง 6005 &lt; SS6005 × 50%
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--text);cursor:pointer">
         <input type="checkbox" id="rc3" onchange="runRecommend()" style="accent-color:var(--accent)"> คงคลัง = 0 &amp; มีความต้องการ (ZMB25)
       </label>
       <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--text);cursor:pointer">
@@ -7551,8 +7554,10 @@ function runRecommend(){
   // ถ้ายังไม่ได้โหลด SS — โหลดก่อนแล้ว re-run
   const ss21Empty = (_ssData.ss21||[]).length===0;
   const ss23Empty = (_ssData.ss23||[]).length===0;
+  const ss6005Empty = (_ssData.ss6005||[]).length===0;
   if(ss21Empty && !_ss21Loaded){ _ss21Loaded=true; fetchSafetyStock('ss21'); showToast('กำลังโหลด Safety Stock 0021…'); setTimeout(runRecommend,2500); return; }
   if(ss23Empty && !_ss23Loaded){ _ss23Loaded=true; fetchSafetyStock('ss23'); showToast('กำลังโหลด Safety Stock 0023…'); setTimeout(runRecommend,2500); return; }
+  if(ss6005Empty && !_ss6005Loaded){ _ss6005Loaded=true; fetchSafetyStock('ss6005'); showToast('กำลังโหลด Safety Stock 6005…'); setTimeout(runRecommend,2500); return; }
 
   // ใช้ setTimeout เพื่อไม่ block UI thread
   const rcStats=document.getElementById('rcStats');
@@ -7563,24 +7568,31 @@ function runRecommend(){
   const c1 = document.getElementById('rc1')?.checked;
   const c2a = document.getElementById('rc2a')?.checked;
   const c2b = document.getElementById('rc2b')?.checked;
+  const c2c = document.getElementById('rc2c')?.checked;
   const c3 = document.getElementById('rc3')?.checked;
   const c4 = document.getElementById('rc4')?.checked;
   const grpF = (document.getElementById('rcGroup')||{}).value||'';
 
-  // SS map จาก _ssData (ss21+ss23) — field r.ss
-  const ssMap21={}, ssMap23={};
+  // SS map จาก _ssData (ss21+ss23+ss6005) — field r.ss
+  const ssMap21={}, ssMap23={}, ssMap6005={};
   (_ssData.ss21||[]).forEach(function(r){ ssMap21[r.code]=parseFloat(r.ss||r.ssQty||0)||0; });
   (_ssData.ss23||[]).forEach(function(r){ ssMap23[r.code]=parseFloat(r.ss||r.ssQty||0)||0; });
+  // ss6005: รหัสเดียวกันอาจมีทั้ง 33kV และ 115kV → ใช้ค่า max (เข้มงวดที่สุด)
+  (_ssData.ss6005||[]).forEach(function(r){
+    var v=parseFloat(r.ss||r.ssQty||0)||0;
+    ssMap6005[r.code]=Math.max(ssMap6005[r.code]||0,v);
+  });
 
-  // ── pre-compute stk21/stk23 ต่อ code (ไม่วน loop ซ้ำต่อ code)
-  const preStk21={}, preStk23={};
+  // ── pre-compute stk21/stk23/stk6005 ต่อ code
+  const preStk21={}, preStk23={}, preStk6005={};
   (invData||[]).forEach(function(inv){
     if(inv.batch && inv.batch!=='N' && inv.batch!=='') return;
     if(!inv.whStock) return;
     Object.entries(inv.whStock).forEach(function(e){
       var wh=e[0], v=parseFloat(e[1])||0;
-      if(wh==='0021'){ preStk21[inv.code]=(preStk21[inv.code]||0)+v; }
-      if(wh==='0023'){ preStk23[inv.code]=(preStk23[inv.code]||0)+v; }
+      if(wh==='0021'||wh==='21'){ preStk21[inv.code]=(preStk21[inv.code]||0)+v; }
+      if(wh==='0023'||wh==='23'){ preStk23[inv.code]=(preStk23[inv.code]||0)+v; }
+      if(wh==='6005'||wh==='6005'){ preStk6005[inv.code]=(preStk6005[inv.code]||0)+v; }
     });
   });
 
@@ -7615,11 +7627,11 @@ function runRecommend(){
   });
 
   // ── priority level ──────────────────────────────────────────
-  function getPriority(stock, ml, stk21, ss21v, stk23, ss23v, demand, hasProcure){
+  function getPriority(stock, ml, stk21, ss21v, stk23, ss23v, stk6005, ss6005v, demand, hasProcure){
     if(stock===0 && demand>0) return {level:1,label:'🔴 วิกฤต',color:'var(--accent2)'};
     if(ml!==null && ml<1)    return {level:2,label:'🟠 เร่งด่วนมาก',color:'#fb923c'};
     if(ml!==null && ml<3)    return {level:3,label:'🟡 เร่งด่วน',color:'var(--accent3)'};
-    if((ss21v>0&&stk21<ss21v*0.5)||(ss23v>0&&stk23<ss23v*0.5))
+    if((ss21v>0&&stk21<ss21v*0.5)||(ss23v>0&&stk23<ss23v*0.5)||(ss6005v>0&&stk6005<ss6005v*0.5))
                               return {level:4,label:'🔵 ควรดำเนินการ',color:'var(--blue)'};
     return {level:5,label:'⚪ ติดตาม',color:'var(--muted)'};
   }
@@ -7631,9 +7643,11 @@ function runRecommend(){
     const ml = avg>0 ? Math.round((stock/avg)*10)/10 : (stock===0?0:null);
     const ss21v=ssMap21[r.code]||0;
     const ss23v=ssMap23[r.code]||0;
-    // stock เฉพาะ wh 0021 และ 0023
+    const ss6005v=ssMap6005[r.code]||0;
+    // stock เฉพาะ wh 0021, 0023 และ 6005
     const stk21=Math.round((preStk21[r.code]||0)*100)/100;
     const stk23=Math.round((preStk23[r.code]||0)*100)/100;
+    const stk6005=Math.round((preStk6005[r.code]||0)*100)/100;
     const demand = zmbMap[r.code]||0;
     const nopo = computePending(r.code,'nopo');
     const p103 = computePending(r.code,'103');
@@ -7646,11 +7660,12 @@ function runRecommend(){
     const m_c1 = c1 ? (avg>0 && ml!==null && ml<3) : true;
     const m_c2a = c2a ? (ss21v>0 && stk21<ss21v*0.5) : true;
     const m_c2b = c2b ? (ss23v>0 && stk23<ss23v*0.5) : true;
+    const m_c2c = c2c ? (ss6005v>0 && stk6005<ss6005v*0.5) : true;
     const m_c3 = c3 ? (stock===0 && demand>0) : true;
     const m_c4 = c4 ? (avg>0 && ml!==null && ml<3 && hasProcure===0) : true;
 
     // AND — ต้องผ่านทุกเงื่อนไขที่ติ๊ก
-    if(!m_c1||!m_c2a||!m_c2b||!m_c3||!m_c4) return;
+    if(!m_c1||!m_c2a||!m_c2b||!m_c2c||!m_c3||!m_c4) return;
     if(grpF && grp!==grpF) return;
     if(demand===0) return;
 
@@ -7659,13 +7674,14 @@ function runRecommend(){
     if(c1 && avg>0 && ml!==null && ml<3) reasons.push('⏱ ใช้ได้ <3 เดือน');
     if(c2a && ss21v>0 && stk21<ss21v*0.5) reasons.push('📉 0021<SS ('+stk21+'/'+ss21v+')');
     if(c2b && ss23v>0 && stk23<ss23v*0.5) reasons.push('📉 0023<SS ('+stk23+'/'+ss23v+')');
+    if(c2c && ss6005v>0 && stk6005<ss6005v*0.5) reasons.push('⚡ 6005<SS ('+stk6005+'/'+ss6005v+')');
     if(c3 && stock===0 && demand>0) reasons.push('🔴 คงคลัง=0');
     if(c4 && avg>0 && ml!==null && ml<3 && hasProcure===0) reasons.push('⚠ ไม่มี PR/PO');
 
-    const priority=getPriority(stock,ml,stk21,ss21v,stk23,ss23v,demand,hasProcure);
+    const priority=getPriority(stock,ml,stk21,ss21v,stk23,ss23v,stk6005,ss6005v,demand,hasProcure);
     candidates.push({code:r.code,name:r.name,stock,avg,ml,demand,
       nopo,p103,p105,me2n,reasons,prList:prMap[r.code]||[],group:grp,
-      ss21:ss21v,ss23:ss23v,stk21,stk23,priority});
+      ss21:ss21v,ss23:ss23v,ss6005:ss6005v,stk21,stk23,stk6005,priority});
   });
 
   // sort by priority level → ml asc
@@ -7687,8 +7703,8 @@ function runRecommend(){
   }
 
   const pLv=function(l){return candidates.filter(function(r){return r.priority&&r.priority.level===l;}).length;};
-  const ssWarn = Object.keys(ssMap21).length===0 && Object.keys(ssMap23).length===0
-    ? '<div style="grid-column:1/-1;font-size:.78rem;color:var(--accent3);padding:4px 0">⚠ ยังไม่มีข้อมูล Safety Stock — กรุณาเข้าหน้า SS 0021/0023 ก่อน แล้ววิเคราะห์ใหม่</div>' : '';
+  const ssWarn = Object.keys(ssMap21).length===0 && Object.keys(ssMap23).length===0 && Object.keys(ssMap6005).length===0
+    ? '<div style="grid-column:1/-1;font-size:.78rem;color:var(--accent3);padding:4px 0">⚠ ยังไม่มีข้อมูล Safety Stock — กรุณาเข้าหน้า SS 0021/0023/6005 ก่อน แล้ววิเคราะห์ใหม่</div>' : '';
   const el=document.getElementById('rcStats');
   if(el) el.innerHTML=ssWarn+
     '<div class="sc r"><div class="sc-label">ทั้งหมด</div><div class="sc-val">'+candidates.length+'</div></div>'+
