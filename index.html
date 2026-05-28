@@ -2226,7 +2226,7 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
     <div class="toolbar" style="margin-bottom:10px">
       <div class="sw">
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input type="text" id="borrowSearch" placeholder="ค้นหารหัส / ชื่อ / ผู้ยืม…" oninput="renderBorrow()">
+        <input type="text" id="borrowSearch" placeholder="ค้นหารหัส / ชื่อ / ผู้ยืม…" oninput="debounce(renderBorrow)()">
       </div>
       <select id="borrowStatusFilter" onchange="renderBorrow()" style="font-size:.83rem">
         <option value="">ทุกสถานะ</option>
@@ -2274,14 +2274,14 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
       </div>
       <div id="concreteChartInner" style="overflow:auto;padding:4px 22px 18px;flex:1;min-height:0"></div>
     </div>
-    <div class="toolbar" style="margin-bottom:14px"><div class="sw"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" id="concreteSearch" placeholder="ค้นหา WBS / รหัส…" oninput="renderConcrete()"></div><select id="concreteCodeFilter" onchange="renderConcrete()" style="font-size:.83rem"><option value="">ทุกรหัสคอนกรีต</option></select><select id="concreteSuperFilter" onchange="renderConcrete()" style="font-size:.83rem"><option value="">ทุกช่างควบคุม</option></select><label style="display:flex;align-items:center;gap:6px;font-size:.83rem;color:var(--muted);cursor:pointer;white-space:nowrap"><input type="checkbox" id="concreteShowZero" onchange="renderConcrete()"> แสดงความต้องการ = 0</label><button class="btn btn-ghost" onclick="exportConcreteCSV()">⬇ ส่งออก CSV</button><span class="cnt" id="concreteCount"></span></div>
+    <div class="toolbar" style="margin-bottom:14px"><div class="sw"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" id="concreteSearch" placeholder="ค้นหา WBS / รหัส…" oninput="debounce(renderConcrete)()"></div><select id="concreteCodeFilter" onchange="renderConcrete()" style="font-size:.83rem"><option value="">ทุกรหัสคอนกรีต</option></select><select id="concreteSuperFilter" onchange="renderConcrete()" style="font-size:.83rem"><option value="">ทุกช่างควบคุม</option></select><label style="display:flex;align-items:center;gap:6px;font-size:.83rem;color:var(--muted);cursor:pointer;white-space:nowrap"><input type="checkbox" id="concreteShowZero" onchange="renderConcrete()"> แสดงความต้องการ = 0</label><button class="btn btn-ghost" onclick="exportConcreteCSV()">⬇ ส่งออก CSV</button><span class="cnt" id="concreteCount"></span></div>
     <div class="tw"><div class="ts"><table><thead><tr><th data-tbl="concrete" data-col="code">รหัสวัสดุ <span class="si">↕</span></th><th data-tbl="concrete" data-col="name">ชื่อวัสดุ <span class="si">↕</span></th><th data-tbl="concrete" data-col="wbs">WBS <span class="si">↕</span></th><th data-tbl="concrete" data-col="wbsName">ชื่องาน <span class="si">↕</span></th><th data-tbl="concrete" data-col="network">โครงข่าย <span class="si">↕</span></th><th data-tbl="concrete" data-col="supervisor">ช่างควบคุม <span class="si">↕</span></th><th data-tbl="concrete" data-col="estimate" style="color:var(--muted)">ประมาณการ <span class="si">↕</span></th><th data-tbl="concrete" data-col="moved" style="color:var(--accent)">เบิกแล้ว <span class="si">↕</span></th><th data-tbl="concrete" data-col="demand" style="color:var(--accent3)">ความต้องการ <span class="si">↕</span></th><th data-tbl="concrete" data-col="status">สถานะ <span class="si">↕</span></th><th data-tbl="concrete" data-col="reqDate">วันที่ <span class="si">↕</span></th></tr></thead><tbody id="concreteBody"></tbody></table></div><div class="pag"><span id="concretePi"></span><div class="pbtns" id="concretePbtns"></div></div></div>
   </div>
 
   <!-- ══ TAB 7: MB51 เคลื่อนไหวพัสดุ ══ -->
   <div class="tab-panel" id="tab-mb51">
     <div class="stats" id="mb51StatsRow" style="margin-bottom:20px"></div>
-    <div class="toolbar" style="margin-bottom:14px;flex-wrap:wrap"><div class="sw"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" id="mb51Search" placeholder="ค้นหารหัส / ชื่อพัสดุ…" oninput="renderMb51()"></div>
+    <div class="toolbar" style="margin-bottom:14px;flex-wrap:wrap"><div class="sw"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" id="mb51Search" placeholder="ค้นหารหัส / ชื่อพัสดุ…" oninput="debounce(renderMb51)()"></div>
       <select id="mb51AlertFilter" onchange="renderMb51()" style="font-size:.83rem"><option value="">ทุกสถานะ</option><option value="dead">🔴 Dead Stock</option><option value="slow">🟡 Slow Moving</option><option value="normal">🟢 ปกติ</option></select>
       <select id="mb51MonthsFilter" onchange="renderMb51()" style="font-size:.83rem"><option value="">ทุกระยะ</option><option value="3">ใช้ได้ &lt; 3 เดือน</option><option value="6">ใช้ได้ &lt; 6 เดือน</option><option value="12">ใช้ได้ &lt; 12 เดือน</option></select>
       <select id="mb51StockFilter" onchange="renderMb51()" style="font-size:.83rem"><option value="">ทุกคงคลัง</option><option value="zero">คงคลัง = 0</option><option value="pos" selected>คงคลัง &gt; 0</option></select>
@@ -2425,7 +2425,7 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
         <div style="font-size:.78rem;color:var(--muted)">เปรียบเทียบ Safety Stock กับคงคลัง MB52 (0021)</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="text" id="ss21Search" placeholder="🔍 ค้นหารหัส / ชื่อ..." oninput="renderSafetyStock('ss21')"
+        <input type="text" id="ss21Search" placeholder="🔍 ค้นหารหัส / ชื่อ..." oninput="debounce(function(){renderSafetyStock('ss21')})()"
           style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.83rem;outline:none;min-width:200px">
         <select id="ss21Group" onchange="renderSafetyStock('ss21')"
           style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.83rem;outline:none">
@@ -2469,7 +2469,7 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
         <div style="font-size:.78rem;color:var(--muted)">เปรียบเทียบ Safety Stock กับคงคลัง MB52 (0023)</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="text" id="ss23Search" placeholder="🔍 ค้นหารหัส / ชื่อ..." oninput="renderSafetyStock('ss23')"
+        <input type="text" id="ss23Search" placeholder="🔍 ค้นหารหัส / ชื่อ..." oninput="debounce(function(){renderSafetyStock('ss23')})()"
           style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.83rem;outline:none;min-width:200px">
         <select id="ss23Group" onchange="renderSafetyStock('ss23')"
           style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.83rem;outline:none">
@@ -2512,7 +2512,7 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
         <div style="font-size:.78rem;color:var(--muted)">ข้อมูล PO/STO การจัดสรรพัสดุเข้าคลัง K040</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="text" id="me2nSearch" placeholder="🔍 ค้นหารหัส / ชื่อ / PO..." oninput="renderMe2n()"
+        <input type="text" id="me2nSearch" placeholder="🔍 ค้นหารหัส / ชื่อ / PO..." oninput="debounce(renderMe2n)()"
           style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.83rem;outline:none;min-width:200px">
         <select id="me2nGroupFilter" onchange="renderMe2n()"
           style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.83rem;outline:none">
@@ -2791,7 +2791,7 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
         <select id="rcGroup" onchange="runRecommend()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.82rem;outline:none;min-width:160px">
           <option value="">ทุกกลุ่มพัสดุ</option>
         </select>
-        <input type="text" id="rcSearch" placeholder="🔍 ค้นหา..." oninput="renderRecommend()"
+        <input type="text" id="rcSearch" placeholder="🔍 ค้นหา..." oninput="debounce(renderRecommend)()"
           style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.82rem;outline:none;min-width:160px">
       </div>
     </div>
@@ -3599,7 +3599,46 @@ function handleFile(event){
 function lvl(s){if(s>=500)return{k:'hi',l:'สูง',c:'hi'};if(s>=50)return{k:'ok',l:'ปกติ',c:'ok'};return{k:'low',l:'ต่ำ',c:'low'};}
 
 // ══ Compute pending qty per code ══════════════════════════════
-function computePending(code,col){var c=String(code||"").replace(/-/g,"").trim();var s=function(a){var t=0;for(var i=0;i<a.length;i++){var n=parseFloat(String(a[i].qty||"").replace(/,/g,""));if(!isNaN(n))t+=n;}return t;};if(col==="103"){var r=[];for(var i=0;i<prData.length;i++){var x=prData[i];if(String(x.itemCode||"").replace(/-/g,"").trim()===c&&x.s103==="รอรับ"&&x.poNo&&x.poNo!=="–"&&x.poNo!=="")r.push(x);}return s(r);}if(col==="105"){var r=[];for(var i=0;i<prData.length;i++){var x=prData[i];if(String(x.itemCode||"").replace(/-/g,"").trim()===c&&x.s103==="รับแล้ว"&&x.s105==="รอรับ")r.push(x);}return s(r);}if(col==="nopo"){var r=[];for(var i=0;i<prData.length;i++){var x=prData[i];if(String(x.itemCode||"").replace(/-/g,"").trim()===c&&x.s103!=="ยกเลิก"&&(!x.poNo||x.poNo==="–"||x.poNo===""))r.push(x);}return s(r);}return 0;}
+function computePending(code, col) {
+  // normalize code — ตัด dash และ space ทั้งหมด
+  var c = String(code || '').replace(/-/g, '').trim();
+
+  // รวม qty จาก array ของ PR rows
+  function sumQty(arr) {
+    var total = 0;
+    for (var i = 0; i < arr.length; i++) {
+      var n = parseFloat(String(arr[i].qty || '').replace(/,/g, ''));
+      if (!isNaN(n)) total += n;
+    }
+    return total;
+  }
+
+  var matched = [];
+  for (var i = 0; i < prData.length; i++) {
+    var x = prData[i];
+    var xCode = String(x.itemCode || '').replace(/-/g, '').trim();
+    if (xCode !== c) continue;
+
+    if (col === '103') {
+      // รอรับ 103: มี PO แล้ว และยังไม่รับ
+      if (x.s103 === 'รอรับ' && x.poNo && x.poNo !== '–' && x.poNo !== '') {
+        matched.push(x);
+      }
+    } else if (col === '105') {
+      // รอรับ 105: รับ 103 แล้ว แต่ยังไม่รับ 105
+      if (x.s103 === 'รับแล้ว' && x.s105 === 'รอรับ') {
+        matched.push(x);
+      }
+    } else if (col === 'nopo') {
+      // ยังไม่มี PO: ไม่ถูกยกเลิก และยังไม่มีเลข PO
+      if (x.s103 !== 'ยกเลิก' && (!x.poNo || x.poNo === '–' || x.poNo === '')) {
+        matched.push(x);
+      }
+    }
+  }
+
+  return sumQty(matched);
+}
 
 // ══ Inventory ═════════════════════════════════════════════════
 
@@ -3791,9 +3830,21 @@ function renderInv(){
   if(invPage>pages)invPage=pages;
   const sl=rows.slice((invPage-1)*PS,invPage*PS);
   document.getElementById('invCount').textContent=`แสดง ${sl.length} / ${total} รายการ`;
-  document.getElementById('invBody').innerHTML=sl.map((r,i)=>{
+  // cache DOM reference ก่อน loop
+  var invBodyEl = document.getElementById('invBody');
+  if (!invBodyEl) return;
+  invBodyEl.innerHTML=sl.map((r,i)=>{
     const lv=lvl(r.stock),pct=Math.min(100,Math.round(r.stock/maxS*100));
     const bc=lv.k==='hi'?'var(--blue)':lv.k==='ok'?'var(--accent)':'var(--accent3)';
+    // cache mb51MonthsMap lookup ต่อ row — ไม่ต้องเรียก 3 ครั้ง
+    var _m51 = window.mb51MonthsMap && window.mb51MonthsMap[r.code];
+    var _ml  = (_m51 && _m51.avg) ? Math.round((r.stock / _m51.avg) * 10) / 10 : null;
+    var mlColor  = _ml===null ? 'var(--muted)' : _ml<3 ? 'var(--accent2)' : _ml<6 ? 'var(--accent3)' : 'var(--blue)';
+    var mlWeight = _ml!==null && _ml<6 ? '700' : '400';
+    var mlText   = _ml===null ? '–' : _ml;
+    // cache totalProcure ต่อ row
+    var _me2nQty = (window.me2nSumMap && window.me2nSumMap[r.code]) || 0;
+    var totalProc = (r.pendingNoPO||0)+(r.pending103||0)+(r.pending105||0)+_me2nQty;
     return `<tr style="animation-delay:${i*15}ms" onclick="openInvMo(${r.id})">
       <td class="mono" style="color:var(--text);font-weight:600">${r.code}</td>
       <td>${r.name?`<span style="font-weight:500">${r.name}</span>`:'<span class="no-name">–</span>'}</td>
@@ -3804,8 +3855,8 @@ function renderInv(){
       <td class="mono" style="color:var(--text)">${r.value.toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
       <td class="mono" style="color:${r.demand>0?'var(--accent3)':'var(--muted)'};font-weight:${r.demand>0?'600':'400'}">${r.demand>0?r.demand.toLocaleString():'–'}</td>
       <td class="mono" style="${r.demand>0?(r.surplus>=0?'color:var(--accent);font-weight:600':'color:var(--accent2);font-weight:600'):'color:var(--muted)'}">${r.demand>0?(r.surplus>=0?'+'+r.surplus.toLocaleString():r.surplus.toLocaleString()):'–'}</td>
-      <td class="mono" style="color:${(function(){var m=window.mb51MonthsMap&&window.mb51MonthsMap[r.code];if(!m||!m.avg)return 'var(--muted)';var ml=Math.round((r.stock/m.avg)*10)/10;return ml<3?'var(--accent2)':ml<6?'var(--accent3)':'var(--blue)';})()};font-weight:${(function(){var m=window.mb51MonthsMap&&window.mb51MonthsMap[r.code];if(!m||!m.avg)return '400';var ml=Math.round((r.stock/m.avg)*10)/10;return ml<6?'700':'400';})()}">${(function(){var m=window.mb51MonthsMap&&window.mb51MonthsMap[r.code];if(!m||!m.avg)return '–';return Math.round((r.stock/m.avg)*10)/10;})()}</td>
-      <td class="mono" style="${(function(){var t=(r.pendingNoPO||0)+(r.pending103||0)+(r.pending105||0)+((window.me2nSumMap&&window.me2nSumMap[r.code])||0);return t>0?'color:var(--accent);font-weight:600':'color:var(--muted)'})()}">${(function(){var t=(r.pendingNoPO||0)+(r.pending103||0)+(r.pending105||0)+((window.me2nSumMap&&window.me2nSumMap[r.code])||0);return t>0?t.toLocaleString():'–'})()}</td>
+      <td class="mono" style="color:${mlColor};font-weight:${mlWeight}">${mlText}</td>
+      <td class="mono" style="${totalProc>0?'color:var(--accent);font-weight:600':'color:var(--muted)'}">${totalProc>0?totalProc.toLocaleString():'–'}</td>
     </tr>`;
   }).join('');
   renderPag('invPi','invPbtns',invPage,pages,total,p=>{invPage=p;renderInv();});
@@ -4031,14 +4082,37 @@ document.querySelectorAll('th[data-tbl="pr"]').forEach(th=>{th.addEventListener(
   prPage=1;renderPr();
 });});
 
+// ══ Debounce utility ══════════════════════════════════════════
+// ใช้สำหรับ search input ทุก Tab — หน่วงเวลา 280ms ก่อน render
+// เพื่อลด DOM rebuild ขณะผู้ใช้ยังพิมพ์อยู่
+function debounce(fn, delay) {
+  var t;
+  return function() {
+    var ctx = this, args = arguments;
+    clearTimeout(t);
+    t = setTimeout(function() { fn.apply(ctx, args); }, delay || 280);
+  };
+}
+
 // ══ Filter handlers ═══════════════════════════════════════════
-document.getElementById('si').addEventListener('input',e=>{invFilter.text=e.target.value;invPage=1;renderInv();});
+document.getElementById('si').addEventListener('input', debounce(function(e) {
+  invFilter.text = e.target.value;
+  invPage = 1;
+  renderInv();
+}));
 document.getElementById('groupFilter').addEventListener('change',e=>{invFilter.group=e.target.value;invPage=1;renderInv();});
 const ufEl=document.getElementById('unitFilter');
 if(ufEl) ufEl.addEventListener('change',e=>{invFilter.unit=e.target.value;invPage=1;renderInv();});
-document.getElementById('prSearch').addEventListener('input',e=>{prFilter.text=e.target.value;prPage=1;renderPr();});
-document.getElementById('poNoFilter').addEventListener('input',e=>{prFilter.poNo=e.target.value;prPage=1;renderPr();});
-document.getElementById('prGroupFilter').addEventListener('change',e=>{prFilter.group=e.target.value;prPage=1;renderPr();});
+document.getElementById('prSearch').addEventListener('input', debounce(function(e) {
+  prFilter.text = e.target.value;
+  prPage = 1;
+  renderPr();
+}));
+document.getElementById('poNoFilter').addEventListener('input', debounce(function(e) {
+  prFilter.poNo = e.target.value;
+  prPage = 1;
+  renderPr();
+}));
 document.getElementById('prGroupFilter').addEventListener('change',e=>{prFilter.group=e.target.value;prPage=1;renderPr();});
 
 // ══ Modals ════════════════════════════════════════════════════
@@ -4510,7 +4584,12 @@ document.querySelectorAll('th[data-tbl="lt"]').forEach(th=>{th.addEventListener(
   ltPage=1;renderLt();
 });});
 
-document.getElementById('ltSearch')?.addEventListener('input',e=>{ltSearch=e.target.value;ltPage=1;ltDPage=1;renderLt();});
+document.getElementById('ltSearch')?.addEventListener('input', debounce(function(e) {
+  ltSearch = e.target.value;
+  ltPage = 1;
+  ltDPage = 1;
+  renderLt();
+}));
 
 function exportLtCSV(){
   const {summary}=buildLtData();
@@ -4751,7 +4830,11 @@ document.querySelectorAll('th[data-tbl="zmb"]').forEach(th=>{th.addEventListener
   zmbPage=1;renderZmb();
 });});
 
-document.getElementById('zmbSearch')?.addEventListener('input',e=>{zmbSearch=e.target.value;zmbPage=1;renderZmb();});
+document.getElementById('zmbSearch')?.addEventListener('input', debounce(function(e) {
+  zmbSearch = e.target.value;
+  zmbPage = 1;
+  renderZmb();
+}));
 document.getElementById('zmbStatusFilter')?.addEventListener('change',e=>{zmbStatusFilter=e.target.value;zmbPage=1;renderZmb();});
 document.getElementById('zmbGroupFilter')?.addEventListener('change',e=>{zmbGroupFilter=e.target.value;zmbPage=1;renderZmb();});
 
@@ -6596,7 +6679,13 @@ window.loadMb51Cloud=async function(){
 
 // ══ ติดตามคอนกรีต ════════════════════════════════════════════
 var CONCRETE_GROUP_KEYWORDS=['เสา','คอน','คาน','สมอบก'];
-function isConcreteCode(code){var grp=(groupMap[code]||'').toLowerCase();for(var i=0;i<CONCRETE_GROUP_KEYWORDS.length;i++){if(grp.includes(CONCRETE_GROUP_KEYWORDS[i].toLowerCase()))return true;}return false;}
+function isConcreteCode(code) {
+  var grp = (groupMap[code] || '').toLowerCase();
+  for (var i = 0; i < CONCRETE_GROUP_KEYWORDS.length; i++) {
+    if (grp.includes(CONCRETE_GROUP_KEYWORDS[i].toLowerCase())) return true;
+  }
+  return false;
+}
 var concreteData=[],concreteSummary=[],concreteSort={col:'wbs',dir:1},concretePage=1,CONCRETE_PS=30;
 function buildConcreteData(){
   if(!zmb25Data||!zmb25Data.length){concreteData=[];concreteSummary=[];renderConcrete();return;}
@@ -6614,7 +6703,49 @@ function buildConcreteData(){
   document.querySelectorAll('th[data-tbl="concrete"]').forEach(function(th){th.onclick=function(){if(concreteSort.col===th.dataset.col)concreteSort.dir*=-1;else{concreteSort.col=th.dataset.col;concreteSort.dir=1;}concretePage=1;renderConcrete();};});
   renderConcrete();
 }
-function filteredConcrete(){var q=(document.getElementById('concreteSearch')&&document.getElementById('concreteSearch').value||'').toLowerCase();var cf=document.getElementById('concreteCodeFilter')&&document.getElementById('concreteCodeFilter').value||'';var sf=document.getElementById('concreteSuperFilter')&&document.getElementById('concreteSuperFilter').value||'';var showZero=document.getElementById('concreteShowZero')&&document.getElementById('concreteShowZero').checked;var res=[];for(var i=0;i<concreteData.length;i++){var r=concreteData[i];if(!showZero&&r.demand===0)continue;var tm=!q||r.code.includes(q)||r.name.toLowerCase().includes(q)||r.wbs.toLowerCase().includes(q)||r.wbsName.toLowerCase().includes(q);if(!tm||(cf&&r.code!==cf)||(sf&&r.supervisor!==sf))continue;res.push(r);}res.sort(function(a,b){var va=a[concreteSort.col]||'',vb=b[concreteSort.col]||'';if(typeof va==='string'){va=va.toLowerCase();vb=vb.toLowerCase();}return va<vb?-concreteSort.dir:va>vb?concreteSort.dir:0;});return res;}
+function filteredConcrete() {
+  // อ่าน filter values จาก DOM — cache ไว้นอก loop
+  var searchEl  = document.getElementById('concreteSearch');
+  var codeEl    = document.getElementById('concreteCodeFilter');
+  var superEl   = document.getElementById('concreteSuperFilter');
+  var showZeroEl = document.getElementById('concreteShowZero');
+
+  var q        = (searchEl  ? searchEl.value  : '').toLowerCase();
+  var cf       = codeEl     ? codeEl.value    : '';
+  var sf       = superEl    ? superEl.value   : '';
+  var showZero = showZeroEl ? showZeroEl.checked : false;
+
+  var res = [];
+  for (var i = 0; i < concreteData.length; i++) {
+    var r = concreteData[i];
+
+    // กรอง demand = 0 (ถ้าไม่ได้ tick แสดง)
+    if (!showZero && r.demand === 0) continue;
+
+    // text search
+    var textMatch = !q
+      || r.code.includes(q)
+      || r.name.toLowerCase().includes(q)
+      || r.wbs.toLowerCase().includes(q)
+      || r.wbsName.toLowerCase().includes(q);
+
+    if (!textMatch) continue;
+    if (cf && r.code !== cf) continue;
+    if (sf && r.supervisor !== sf) continue;
+
+    res.push(r);
+  }
+
+  // sort ตาม concreteSort
+  res.sort(function(a, b) {
+    var va = a[concreteSort.col] || '';
+    var vb = b[concreteSort.col] || '';
+    if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+    return va < vb ? -concreteSort.dir : va > vb ? concreteSort.dir : 0;
+  });
+
+  return res;
+}
 function renderConcrete(){
   var sb=document.getElementById('concreteSummaryBody');
   if(sb){
@@ -6694,7 +6825,21 @@ function showConcreteChart(code){
   if(bx)bx.style.display='flex';
 }
 
-function exportConcreteCSV(){var rows=filteredConcrete();var hdr=['รหัสวัสดุ','ชื่อวัสดุ','กลุ่ม','WBS','ชื่องาน','โครงข่าย','ช่างควบคุม','ประมาณการ','เบิกแล้ว','ความต้องการ','สถานะ','วันที่'];var data=[];for(var i=0;i<rows.length;i++){var r=rows[i];data.push([r.code,r.name,r.group,r.wbs,r.wbsName,r.network,r.supervisor,r.estimate,r.moved,r.demand,r.status,excelDateToStr(r.reqDate)]);}dlCSV([hdr].concat(data),'concrete_tracking.csv');}
+function exportConcreteCSV() {
+  var rows = filteredConcrete();
+  var hdr = ['รหัสวัสดุ','ชื่อวัสดุ','กลุ่ม','WBS','ชื่องาน','โครงข่าย',
+             'ช่างควบคุม','ประมาณการ','เบิกแล้ว','ความต้องการ','สถานะ','วันที่'];
+  var data = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    data.push([
+      r.code, r.name, r.group, r.wbs, r.wbsName, r.network,
+      r.supervisor, r.estimate, r.moved, r.demand, r.status,
+      excelDateToStr(r.reqDate)
+    ]);
+  }
+  dlCSV([hdr].concat(data), 'concrete_tracking.csv');
+}
 
 // ══ จองคิวเบิก-จ่ายพัสดุ ═══════════════════════════════════════
 var queueData = [];          // [{row, date, slot, dept, type, status}]
@@ -8887,103 +9032,7 @@ function _ccPopulatePdfLocs() {
   });
 }
 
-function _ccGeneratePDF(rows, title, isSummary) {
-  var tblRows = '';
-  var gTotal = {sap:0, counted:0, diff:0};
-
-  if (isSummary) {
-    // group by code+batch — แสดง 1 row ต่อรหัส (รวมทุกกอง)
-    var codeMap = {};
-    rows.forEach(function(r) {
-      var key = r.batch + '||' + r.code;
-      if (!codeMap[key]) codeMap[key] = {code:r.code, name:r.name, batch:r.batch,
-        sapTotal:r.sapTotal||r.sapStock, counted:0, diffTotal:0,
-        noteTotal:r.noteTotal||''};
-      codeMap[key].counted += r.counted||0;
-      if (r.noteTotal && !codeMap[key].noteTotal) codeMap[key].noteTotal = r.noteTotal;
-    });
-    Object.values(codeMap).forEach(function(d,i) {
-      d.diffTotal = d.counted - d.sapTotal;
-      var dc = d.diffTotal<0?'color:#dc2626;font-weight:700':d.diffTotal>0?'color:#d97706;font-weight:700':'color:#059669';
-      var noteHtml = d.noteTotal ? '<span style="font-size:9px;color:#6b7280;display:block;white-space:pre-wrap">' + d.noteTotal + '</span>' : '';
-      tblRows += '<tr style="border-bottom:1px solid #e5e7eb">' +
-        '<td style="padding:5px 8px;font-size:10px">' + (i+1) + '</td>' +
-        '<td style="padding:5px 8px;font-family:monospace;font-size:10px">' + d.code + '</td>' +
-        '<td style="padding:5px 8px;font-size:10px">' + d.name + '</td>' +
-        '<td style="padding:5px 8px;text-align:center;font-size:10px">' + d.batch + '</td>' +
-        '<td style="padding:5px 8px;text-align:right;font-size:10px">' + d.sapTotal.toLocaleString() + '</td>' +
-        '<td style="padding:5px 8px;text-align:right;font-size:10px;font-weight:700;color:#1d4ed8">' + d.counted.toLocaleString() + '</td>' +
-        '<td style="padding:5px 8px;text-align:right;font-size:10px;' + dc + '">' + (d.diffTotal>0?'+':'') + d.diffTotal.toLocaleString() + '</td>' +
-        '<td style="padding:5px 8px;font-size:9px;color:#6b7280;max-width:200px;white-space:pre-wrap">' + (d.noteTotal||'') + '</td>' +
-        '</tr>';
-      gTotal.sap += d.sapTotal; gTotal.counted += d.counted; gTotal.diff += d.diffTotal;
-    });
-  } else {
-    // แสดงทีละกอง พร้อม sub-location
-    rows.forEach(function(r,i) {
-      var dc = r.diff<0?'color:#dc2626;font-weight:700':r.diff>0?'color:#d97706;font-weight:700':'color:#059669';
-      var subHtml = '';
-      if (r.subs && Object.keys(r.subs).length) {
-        subHtml = '<br><span style="font-size:9px;color:#6b7280">' +
-          Object.entries(r.subs).filter(function(e){return e[1]>0;})
-            .map(function(e){return e[0]+':'+e[1];}).join(', ') + '</span>';
-      }
-      var noteTotalPdf = r.noteTotal ? '<div style="font-size:9px;color:#92400e;margin-top:3px;white-space:pre-wrap;border-top:1px solid #fde68a;padding-top:2px">' + r.noteTotal + '</div>' : '';
-      tblRows += '<tr style="border-bottom:1px solid #e5e7eb">' +
-        '<td style="padding:5px 8px;font-size:10px">' + (i+1) + '</td>' +
-        '<td style="padding:5px 8px;font-family:monospace;font-size:10px">' + r.code + '</td>' +
-        '<td style="padding:5px 8px;font-size:10px">' + r.name + subHtml + '</td>' +
-        '<td style="padding:5px 8px;text-align:center;font-size:10px">' + r.batch + '</td>' +
-        '<td style="padding:5px 8px;text-align:right;font-size:10px">' + (r.sapStock||0).toLocaleString() + '</td>' +
-        '<td style="padding:5px 8px;text-align:right;font-size:10px;font-weight:700;color:#1d4ed8">' + (r.counted||0).toLocaleString() + '</td>' +
-        '<td style="padding:5px 8px;text-align:right;font-size:10px;' + dc + '">' + (r.diff>0?'+':'') + (r.diff||0).toLocaleString() + '</td>' +
-        '<td style="padding:5px 8px;font-size:9px;color:#6b7280">' + (r.note||'') + noteTotalPdf + '</td>' +
-        '</tr>';
-      gTotal.sap += r.sapStock||0; gTotal.counted += r.counted||0; gTotal.diff += r.diff||0;
-    });
-  }
-
-  var lastColSpan = isSummary ? 4 : 5;
-  var noteCol = isSummary ? '' : '<th style="padding:6px 8px;font-size:10px;text-align:left">หมายเหตุ</th>';
-  var noteColTd = isSummary ? '' : '<td></td>';
-
-  var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
-    '<style>@page{size:A4 landscape;margin:10mm}body{font-family:Sarabun,Tahoma,sans-serif;color:#000}' +
-    'table{border-collapse:collapse;width:100%} @media print{.noprint{display:none}}</style>' +
-    '</head><body>' +
-    '<div class="noprint" style="text-align:right;margin-bottom:8px">' +
-    '<button onclick="window.print()" style="padding:7px 20px;background:#6d28d9;color:#fff;border:none;border-radius:6px;font-family:Sarabun;font-size:13px;cursor:pointer">🖨 พิมพ์</button></div>' +
-    '<div style="text-align:center;margin-bottom:10px">' +
-    '<div style="font-size:14px;font-weight:700">รายงานยอดตรวจนับผลิตภัณฑ์คอนกรีต</div>' +
-    '<div style="font-size:12px">การไฟฟ้าส่วนภูมิภาคจังหวัดกระบี่ (กฟภ.กระบี่)</div>' +
-    '<div style="font-size:11px;color:#374151;margin-top:2px">' + _ccRound + '</div>' +
-    '<div style="font-size:10px;color:#6b7280">วันที่ตรวจนับ: ' + (_ccDate||'–') +
-      (_ccMb52Date?' | ข้อมูล MB52 ณ '+_ccMb52Date:'') + '</div>' +
-    '<div style="font-size:11px;font-weight:600;color:#6d28d9;margin-top:3px">กอง: ' + title + '</div>' +
-    '</div>' +
-    '<table><thead><tr style="background:#f3f0ff;border-bottom:2px solid #6d28d9">' +
-    '<th style="padding:5px 8px;font-size:10px;text-align:left">ลำดับ</th>' +
-    '<th style="padding:5px 8px;font-size:10px;text-align:left">รหัสวัสดุ</th>' +
-    '<th style="padding:5px 8px;font-size:10px;text-align:left">ชื่อพัสดุ</th>' +
-    '<th style="padding:5px 8px;font-size:10px;text-align:center">แบทช์</th>' +
-    '<th style="padding:5px 8px;font-size:10px;text-align:right">ยอด SAP</th>' +
-    '<th style="padding:5px 8px;font-size:10px;text-align:right;color:#1d4ed8">ยอดนับจริง</th>' +
-    '<th style="padding:5px 8px;font-size:10px;text-align:right">ผลต่าง</th>' +
-    noteCol +
-    '</tr></thead><tbody>' + tblRows + '</tbody>' +
-    '<tfoot><tr style="background:#f5f3ff;border-top:2px solid #6d28d9;font-weight:700">' +
-    '<td colspan="' + (isSummary ? lastColSpan+1 : lastColSpan) + '" style="padding:5px 8px;font-size:11px">รวมทั้งหมด (' + (isSummary ? Object.keys(codeMap).length : rows.length) + ' รายการ)</td>' +
-    '<td style="padding:5px 8px;text-align:right;font-size:11px">' + gTotal.sap.toLocaleString() + '</td>' +
-    '<td style="padding:5px 8px;text-align:right;font-size:11px;color:#1d4ed8">' + gTotal.counted.toLocaleString() + '</td>' +
-    '<td style="padding:5px 8px;text-align:right;font-size:11px;' + (gTotal.diff<0?'color:#dc2626':gTotal.diff>0?'color:#d97706':'color:#059669') + '">' +
-      (gTotal.diff>0?'+':'') + gTotal.diff.toLocaleString() + '</td>' +
-    noteColTd + '</tr></tfoot></table>' +
-    '</body></html>';
-
-  var w = window.open('', '_blank', 'width=1100,height=800');
-  if (w) { w.document.write(html); w.document.close(); }
-  else showToast('กรุณาอนุญาต popup ในเบราว์เซอร์', true);
-}
+// (ลบ _ccGeneratePDF เวอร์ชันเก่า 3-args ออก — ใช้เวอร์ชัน 4-args ด้านบนแทน)
 
 
 // ══════════════════════════════════════════════════════════════
