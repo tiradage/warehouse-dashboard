@@ -2843,6 +2843,12 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
         <input type="checkbox" id="rc4" onchange="runRecommend()" style="accent-color:var(--accent)"> ใช้ได้ &lt; 3 เดือน &amp; ไม่มี PR/PO
       </label>
       <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+        <select id="rcSystem6005" onchange="renderRecommend()"
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.82rem;outline:none;min-width:130px">
+          <option value="">ทุกระบบ (6005)</option>
+          <option value="33 kV">⚡ 33 kV</option>
+          <option value="115 kV">⚡ 115 kV</option>
+        </select>
         <select id="rcGroup" onchange="runRecommend()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.82rem;outline:none;min-width:160px">
           <option value="">ทุกกลุ่มพัสดุ</option>
         </select>
@@ -2866,13 +2872,14 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
           <th onclick="sortRc('group')" style="cursor:pointer;user-select:none">กลุ่มพัสดุ <span id="rcSi-group" class="si">↕</span></th>
           <th style="text-align:center;cursor:pointer;user-select:none" onclick="sortRc('urgency')">ความเร่งด่วน <span id="rcSi-urgency" class="si">↕</span></th>
           <th style="text-align:center">เหตุผล</th>
+          <th style="text-align:center;cursor:pointer;user-select:none" onclick="sortRc('system6005')">ระบบ (6005) <span id="rcSi-system6005" class="si">↕</span></th>
           <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortRc('stock')">คงคลัง <span id="rcSi-stock" class="si">↕</span></th>
           <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortRc('avg')">avg/เดือน <span id="rcSi-avg" class="si">↕</span></th>
           <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortRc('ml')">ใช้ได้ (เดือน) <span id="rcSi-ml" class="si">↕</span></th>
           <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortRc('demand')">ความต้องการ <span id="rcSi-demand" class="si">↕</span></th>
           <th>การจัดหาที่มีอยู่แล้ว</th>
         </tr></thead>
-        <tbody id="rcBody"><tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">กด "วิเคราะห์ใหม่" เพื่อเริ่มต้น</td></tr></tbody>
+        <tbody id="rcBody"><tr><td colspan="11" style="text-align:center;padding:40px;color:var(--muted)">กด "วิเคราะห์ใหม่" เพื่อเริ่มต้น</td></tr></tbody>
       </table>
     </div></div>
   </div>
@@ -7678,10 +7685,18 @@ function runRecommend(){
     if(c3 && stock===0 && demand>0) reasons.push('🔴 คงคลัง=0');
     if(c4 && avg>0 && ml!==null && ml<3 && hasProcure===0) reasons.push('⚠ ไม่มี PR/PO');
 
+    // ดึงระบบ 33kV/115kV จาก _ssData.ss6005 (อาจมีหลายแถวต่อรหัส)
+    var systemSet = new Set();
+    (_ssData.ss6005||[]).forEach(function(s){
+      if(s.code===r.code && s.system) systemSet.add(s.system);
+    });
+    var system6005 = systemSet.size ? [...systemSet].sort().join(', ') : '';
+
     const priority=getPriority(stock,ml,stk21,ss21v,stk23,ss23v,stk6005,ss6005v,demand,hasProcure);
     candidates.push({code:r.code,name:r.name,stock,avg,ml,demand,
       nopo,p103,p105,me2n,reasons,prList:prMap[r.code]||[],group:grp,
-      ss21:ss21v,ss23:ss23v,ss6005:ss6005v,stk21,stk23,stk6005,priority});
+      ss21:ss21v,ss23:ss23v,ss6005:ss6005v,stk21,stk23,stk6005,
+      system6005:system6005,priority});
   });
 
   // sort by priority level → ml asc
@@ -7720,29 +7735,32 @@ function runRecommend(){
 
 function renderRecommend(){
   const q=((document.getElementById('rcSearch')||{}).value||'').toLowerCase();
-  // urgency order: วิกฤต=0, เร่งด่วนมาก=1, เร่งด่วน=2, ควรดำเนินการ=3, ติดตาม=4
+  const sysF=((document.getElementById('rcSystem6005')||{}).value||'');
   var rows=_rcResult.filter(function(r){
-    if(!q) return true;
-    return r.code.toLowerCase().includes(q)||r.name.toLowerCase().includes(q);
+    if(q && !r.code.toLowerCase().includes(q) && !r.name.toLowerCase().includes(q)) return false;
+    // filter ระบบ 6005: ถ้าเลือก 33kV/115kV → แสดงเฉพาะที่มีใน system6005
+    if(sysF && !(r.system6005||'').includes(sysF)) return false;
+    return true;
   });
 
   // sort
   rows.sort(function(a,b){
     var va, vb, d=_rcSort.dir;
     var col=_rcSort.col;
-    if(col==='code')    { va=a.code||''; vb=b.code||''; return d*va.localeCompare(vb); }
-    if(col==='name')    { va=a.name||''; vb=b.name||''; return d*va.localeCompare(vb,'th'); }
-    if(col==='group')   { va=a.group||''; vb=b.group||''; return d*va.localeCompare(vb,'th'); }
-    if(col==='urgency') { va=a.priority?a.priority.level:99; vb=b.priority?b.priority.level:99; return d*(va-vb); }
-    if(col==='stock')   { va=a.stock||0; vb=b.stock||0; return d*(va-vb); }
-    if(col==='avg')     { va=a.avg||0; vb=b.avg||0; return d*(va-vb); }
-    if(col==='ml')      { va=a.ml===null?9999:a.ml; vb=b.ml===null?9999:b.ml; return d*(va-vb); }
-    if(col==='demand')  { va=a.demand||0; vb=b.demand||0; return d*(va-vb); }
+    if(col==='code')        { va=a.code||''; vb=b.code||''; return d*va.localeCompare(vb); }
+    if(col==='name')        { va=a.name||''; vb=b.name||''; return d*va.localeCompare(vb,'th'); }
+    if(col==='group')       { va=a.group||''; vb=b.group||''; return d*va.localeCompare(vb,'th'); }
+    if(col==='urgency')     { va=a.priority?a.priority.level:99; vb=b.priority?b.priority.level:99; return d*(va-vb); }
+    if(col==='system6005')  { va=a.system6005||''; vb=b.system6005||''; return d*va.localeCompare(vb,'th'); }
+    if(col==='stock')       { va=a.stock||0; vb=b.stock||0; return d*(va-vb); }
+    if(col==='avg')         { va=a.avg||0; vb=b.avg||0; return d*(va-vb); }
+    if(col==='ml')          { va=a.ml===null?9999:a.ml; vb=b.ml===null?9999:b.ml; return d*(va-vb); }
+    if(col==='demand')      { va=a.demand||0; vb=b.demand||0; return d*(va-vb); }
     return 0;
   });
 
   // update sort icons
-  ['code','name','group','urgency','stock','avg','ml','demand'].forEach(function(c){
+  ['code','name','group','urgency','system6005','stock','avg','ml','demand'].forEach(function(c){
     var el=document.getElementById('rcSi-'+c);
     if(el) el.textContent = c===_rcSort.col ? (_rcSort.dir===1?'↑':'↓') : '↕';
   });
@@ -7755,7 +7773,7 @@ function renderRecommend(){
   if(!body) return;
 
   if(!rows.length){
-    body.innerHTML='<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">'+(_rcResult.length?'ไม่พบรายการที่ตรงเงื่อนไข':'กด "วิเคราะห์ใหม่" เพื่อเริ่มต้น')+'</td></tr>';
+    body.innerHTML='<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--muted)">'+(_rcResult.length?'ไม่พบรายการที่ตรงเงื่อนไข':'กด "วิเคราะห์ใหม่" เพื่อเริ่มต้น')+'</td></tr>';
     return;
   }
 
@@ -7763,9 +7781,21 @@ function renderRecommend(){
     const mlColor=r.ml===null?'var(--muted)':r.ml<1?'var(--accent2)':r.ml<3?'var(--accent3)':'var(--muted)';
     const mlTxt=r.ml===null?'–':r.ml.toLocaleString(undefined,{maximumFractionDigits:1});
     const reasonBadges=r.reasons.map(function(x){
-      var c=x.includes('SS')?'var(--blue)':x.includes('คงคลัง=0')?'var(--accent2)':x.includes('ไม่มี PR')?'#fb923c':'var(--accent3)';
+      var c=x.includes('6005')?'#f59e0b':x.includes('SS')?'var(--blue)':x.includes('คงคลัง=0')?'var(--accent2)':x.includes('ไม่มี PR')?'#fb923c':'var(--accent3)';
       return '<span style="font-size:.72rem;padding:2px 7px;border-radius:4px;background:rgba(79,255,176,.08);border:1px solid rgba(79,255,176,.2);color:'+c+';white-space:nowrap">'+esc(x)+'</span>';
     }).join(' ');
+
+    // system6005 badge
+    var systemCell='<td style="text-align:center">–</td>';
+    if(r.system6005){
+      var sysBadges=(r.system6005||'').split(', ').map(function(s){
+        var sc=s==='115 kV'
+          ?'color:#b45309;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4)'
+          :'color:#1d4ed8;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.35)';
+        return '<span style="'+sc+';border-radius:10px;padding:2px 7px;font-size:.73rem;font-weight:600;white-space:nowrap">'+s+'</span>';
+      }).join('<br>');
+      systemCell='<td style="text-align:center">'+sysBadges+'</td>';
+    }
 
     // สร้าง procure detail
     var procureHtml='<div style="font-size:.76rem;color:var(--muted)">–</div>';
@@ -7820,6 +7850,7 @@ function renderRecommend(){
       '<td style="font-size:.75rem;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.group)+'">'+esc(r.group||'–')+'</td>'+
       '<td style="text-align:center;white-space:nowrap"><span style="font-size:.78rem;padding:3px 10px;border-radius:5px;background:rgba(0,0,0,.15);color:'+(r.priority?r.priority.color:'var(--muted)')+'";font-weight:600>'+(r.priority?r.priority.label:'–')+'</span></td>'+
       '<td style="min-width:160px">'+reasonBadges+'</td>'+
+      systemCell+
       '<td class="mono" style="text-align:right;'+(r.stock===0?'color:var(--accent2);font-weight:700':'')+'">'+r.stock.toLocaleString()+'</td>'+
       '<td class="mono" style="text-align:right;color:var(--accent3)">'+(r.avg>0?r.avg.toLocaleString(undefined,{maximumFractionDigits:1}):'–')+'</td>'+
       '<td class="mono" style="text-align:right;font-weight:700;color:'+mlColor+'">'+mlTxt+'</td>'+
