@@ -1981,8 +1981,8 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
         <option value="ok">✅ เพียงพอ</option>
       </select>
       <select id="invNoMb51Filter" onchange="invFilter.noMb51=this.value;invPage=1;renderInv()" style="font-size:.83rem">
-        <option value="">ทุกเฉลี่ยใช้</option>
-        <option value="gt1" selected>เฉลี่ยใช้/เดือน &gt; 1</option>
+        <option value="" selected>ทุกเฉลี่ยใช้</option>
+        <option value="gt1">เฉลี่ยใช้/เดือน &gt; 1</option>
         <option value="lt1">เฉลี่ยใช้/เดือน &lt; 1</option>
       </select>
       <span class="cnt" id="invCount"></span>
@@ -2932,7 +2932,7 @@ let prData  = [];
 let nameMap = {}, imgUrlMap = {}, packagingMap = {}, groupMap = {};
 let gAccessToken = null, gUser = null;
 let invSort={col:'code',dir:1}, prSort={col:'trackNo',dir:1};
-let invFilter={text:'',whs:new Set([...DEFAULT_WH]),unit:'',batch:new Set(['N','']),group:'',monthsLeft:'',mb51Alert:'',shortage:'',noMb51:'gt1'}, prFilter={text:'',prNo:'',poNo:'',s103arr:new Set(),s105arr:new Set(['รอรับ']),group:''};
+let invFilter={text:'',whs:new Set([...DEFAULT_WH]),unit:'',batch:new Set(['N','']),group:'',monthsLeft:'',mb51Alert:'',shortage:'',noMb51:''}, prFilter={text:'',prNo:'',poNo:'',s103arr:new Set(),s105arr:new Set(['รอรับ']),group:''};
 let invPage=1, prPage=1;
 const PS=15;
 
