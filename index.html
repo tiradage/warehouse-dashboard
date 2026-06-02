@@ -2245,8 +2245,8 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
           <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortZmb261('demand')">ปริมาณต้องการ <span id="zmb261Si-demand" class="si">↕</span></th>
           <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortZmb261('moved')">เบิกแล้ว <span id="zmb261Si-moved" class="si">↕</span></th>
           <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortZmb261('diff')">ค้างเบิก <span id="zmb261Si-diff" class="si">↕</span></th>
-          <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortZmb261('stock')">คงคลัง <span id="zmb261Si-stock" class="si">↕</span></th>
-          <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortZmb261('surplus')">ผลต่าง <span id="zmb261Si-surplus" class="si">↕</span></th>
+          <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortZmb261('stock')">คงคลัง (6005) <span id="zmb261Si-stock" class="si">↕</span></th>
+          <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortZmb261('surplus')">ผลต่าง (6005−ค้างเบิก) <span id="zmb261Si-surplus" class="si">↕</span></th>
           <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortZmb261('orderCount')">จำนวน Order <span id="zmb261Si-orderCount" class="si">↕</span></th>
           <th style="text-align:center">สถานะ</th>
         </tr></thead>
@@ -3491,7 +3491,11 @@ async function fetchNames(){
   if(zmb261Result.length){
     zmb261Result.forEach(function(r){
       var s=0;
-      (invData||[]).forEach(function(inv){ if(inv.code===r.code) s+=(inv.stock||0); });
+      (invData||[]).forEach(function(inv){
+        if(inv.code!==r.code) return;
+        if(inv.whStock) s+=parseFloat(inv.whStock['6005']||inv.whStock['06005']||0);
+      });
+      s=Math.round(s*1000)/1000;
       r.stock=s; r.surplus=Math.round((s-r.diff)*1000)/1000;
     });
     renderZmb261();
@@ -4971,11 +4975,15 @@ function processZmb261(rows, idx){
   });
 
   zmb261Result = Object.values(grouped).map(function(g){
-    // หา stock จาก invData
-    var stock = 0;
+    // คงคลัง เฉพาะ WH 6005 เท่านั้น
+    var stock6005 = 0;
     (invData||[]).forEach(function(inv){
-      if(inv.code === g.code) stock += (inv.stock||0);
+      if(inv.code !== g.code) return;
+      if(inv.whStock){
+        stock6005 += parseFloat(inv.whStock['6005']||inv.whStock['06005']||0);
+      }
     });
+    stock6005 = Math.round(stock6005*1000)/1000;
     return {
       code: g.code, name: g.name, unit: g.unit,
       demand: Math.round(g.demand*1000)/1000,
@@ -4984,8 +4992,8 @@ function processZmb261(rows, idx){
       orderCount: g.orders.size,
       latestDate: g.latestDate,
       group: groupMap[g.code]||'',
-      stock: stock,
-      surplus: Math.round((stock - g.diff)*1000)/1000
+      stock: stock6005,
+      surplus: Math.round((stock6005 - g.diff)*1000)/1000
     };
   });
 
