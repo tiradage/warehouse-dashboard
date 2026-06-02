@@ -1888,7 +1888,8 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
       </button>
       <div class="tab-dropdown" id="tg-stock-drop">
         <button class="tab-dd-item active" data-tab="inv" onclick="pickTabGroup('inv','stock')"><span class="dd-dot"></span>📦 สินค้าคงคลัง (MB52)</button>
-        <button class="tab-dd-item" data-tab="zmb" onclick="pickTabGroup('zmb','stock')"><span class="dd-dot"></span>📊 ความต้องการพัสดุ (ZMB25)</button>
+        <button class="tab-dd-item" data-tab="zmb" onclick="pickTabGroup('zmb','stock')"><span class="dd-dot"></span>📊 ความต้องการพัสดุ (ZMB25·281)</button>
+        <button class="tab-dd-item" data-tab="zmb261" onclick="pickTabGroup('zmb261','stock')"><span class="dd-dot"></span>🔧 ความต้องการพัสดุ (ZMB25·261)</button>
         <button class="tab-dd-item" data-tab="mb51" onclick="pickTabGroup('mb51','stock')"><span class="dd-dot"></span>📈 เคลื่อนไหวพัสดุ (MB51)</button>
         <button class="tab-dd-item" data-tab="concrete" onclick="pickTabGroup('concrete','stock')"><span class="dd-dot"></span>🏗 ติดตามคอนกรีต</button>
         <button class="tab-dd-item" data-tab="concrete_count" onclick="pickTabGroup('concrete_count','stock')"><span class="dd-dot"></span>📋 ตรวจนับคอนกรีต</button>
@@ -2196,6 +2197,65 @@ td.mono { font-family: 'IBM Plex Mono', monospace; font-size: .77rem; color: var
         </div>
         <div class="pag"><span id="zmbPi"></span><div class="pbtns" id="zmbPbtns"></div></div>
       </div>
+    </div>
+  </div>
+
+  <!-- ══ TAB: ความต้องการพัสดุ ZMB25·261 (ใบสั่งซ่อม) ══ -->
+  <div class="tab-panel" id="tab-zmb261">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <div>
+        <div class="sec-title" style="margin-bottom:2px">🔧 ความต้องการพัสดุ — ประเภทการเคลื่อนย้าย 261</div>
+        <div style="font-size:.78rem;color:var(--muted)">เบิกพัสดุจากใบสั่งซ่อม (Order-based) — ข้อมูลจากไฟล์ ZMB25 เดิม ไม่ต้องอัปโหลดใหม่</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input type="text" id="zmb261Search" placeholder="🔍 ค้นหารหัส / ชื่อ..."
+          oninput="debounce(renderZmb261)()"
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.83rem;outline:none;min-width:200px">
+        <select id="zmb261StatusFilter" onchange="zmb261StatusFilter=this.value;zmb261Page=1;renderZmb261()"
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.83rem;outline:none">
+          <option value="">ทุกสถานะ</option>
+          <option value="pending">🟡 ค้างเบิก (diff>0)</option>
+          <option value="done">✅ เบิกครบแล้ว</option>
+        </select>
+        <select id="zmb261GroupFilter" onchange="zmb261GroupFilter=this.value;zmb261Page=1;renderZmb261()"
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.83rem;outline:none">
+          <option value="">ทุกกลุ่ม</option>
+        </select>
+        <button onclick="exportZmb261CSV()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:7px;font-family:'Sarabun',sans-serif;font-size:.83rem;cursor:pointer">
+          📥 ส่งออก CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats cards -->
+    <div class="stats" id="zmb261Stats" style="margin-bottom:16px">
+      <div class="sc b" style="grid-column:1/-1;text-align:center;padding:32px">
+        <div class="sc-label" style="font-size:.85rem;margin-bottom:8px">กรุณาอัปโหลดไฟล์ ZMB25 ก่อน</div>
+        <div style="color:var(--muted);font-size:.8rem">ข้อมูล mvt 261 จะแสดงอัตโนมัติหลังอัปโหลด</div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="tw"><div class="ts">
+      <table>
+        <thead><tr>
+          <th onclick="sortZmb261('code')" style="cursor:pointer;user-select:none">รหัสวัสดุ <span id="zmb261Si-code" class="si">↕</span></th>
+          <th onclick="sortZmb261('name')" style="cursor:pointer;user-select:none">ชื่อพัสดุ <span id="zmb261Si-name" class="si">↕</span></th>
+          <th onclick="sortZmb261('group')" style="cursor:pointer;user-select:none">กลุ่มพัสดุ <span id="zmb261Si-group" class="si">↕</span></th>
+          <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortZmb261('demand')">ปริมาณต้องการ <span id="zmb261Si-demand" class="si">↕</span></th>
+          <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortZmb261('moved')">เบิกแล้ว <span id="zmb261Si-moved" class="si">↕</span></th>
+          <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortZmb261('diff')">ค้างเบิก <span id="zmb261Si-diff" class="si">↕</span></th>
+          <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortZmb261('stock')">คงคลัง <span id="zmb261Si-stock" class="si">↕</span></th>
+          <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortZmb261('surplus')">ผลต่าง <span id="zmb261Si-surplus" class="si">↕</span></th>
+          <th style="text-align:right;cursor:pointer;user-select:none" onclick="sortZmb261('orderCount')">จำนวน Order <span id="zmb261Si-orderCount" class="si">↕</span></th>
+          <th style="text-align:center">สถานะ</th>
+        </tr></thead>
+        <tbody id="zmb261Body">
+          <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--muted)">กรุณาอัปโหลด ZMB25 เพื่อดูข้อมูล</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pag"><span id="zmb261Pi"></span><div class="pbtns" id="zmb261Pbtns"></div></div>
     </div>
   </div>
 
@@ -3007,6 +3067,7 @@ function switchTab(id){
   }
   if(id==='lt') renderLt();
   if(id==='zmb') renderZmb();
+  if(id==='zmb261'){ if(zmb261Result.length) renderZmb261(); }
   if(id==='borrow'){
     if(!_borrowLoaded){ _borrowLoaded=true; fetchBorrow(); }
     else renderBorrow();
@@ -3426,6 +3487,15 @@ async function fetchNames(){
   if(_ssData.ss21.length) renderSafetyStock('ss21');
   if(_ssData.ss23.length) renderSafetyStock('ss23');
   if(_ssData.ss6005.length) renderSafetyStock('ss6005');
+  // อัปเดต stock ใน zmb261 เมื่อ invData โหลดใหม่
+  if(zmb261Result.length){
+    zmb261Result.forEach(function(r){
+      var s=0;
+      (invData||[]).forEach(function(inv){ if(inv.code===r.code) s+=(inv.stock||0); });
+      r.stock=s; r.surplus=Math.round((s-r.diff)*1000)/1000;
+    });
+    renderZmb261();
+  }
   showToast(`ดึงชื่อพัสดุสำเร็จ ${Object.keys(nameMap).length} รายการ`);
   // บันทึก groupMap ลง Firestore
   if(window.fbSave && Object.keys(groupMap).length>0) window.fbSave('groupMap', groupMap);
@@ -4707,6 +4777,14 @@ let zmbSort={col:'code',dir:1}, zmbPage=1, zmbSearch='', zmbStatusFilter='', zmb
 const ZMB_PS=20;
 const ZMB_STATUS_FILTER = new Set(['B2','C1','C2','C3']);
 
+// ── ZMB25·261 state ───────────────────────────────────────────
+let zmb261Result = [];
+let zmb261Sort = {col:'diff', dir:-1};
+let zmb261Page = 1;
+let zmb261StatusFilter = 'pending';  // default: แสดงเฉพาะค้างเบิก
+let zmb261GroupFilter = '';
+const ZMB261_PS = 25;
+
 function handleCn43n(event){
   const file=event.target.files[0]; if(!file)return;
   const reader=new FileReader();
@@ -4776,6 +4854,14 @@ function handleZmb25(event){
         network: netIdx>=0?String(r[netIdx]||'').trim():'',
         reqDate: dateIdx>=0?String(r[dateIdx]||'').trim():'',
       }));
+
+      // parse mvt 261 แยก (ใช้ raw rows ทั้งหมด ไม่กรอง wbs)
+      const mvtIdx = hdr.findIndex(h=>h.includes('ประเภทการเคลื่อนย้าย')||h==='Mvt');
+      const orderIdx = hdr.findIndex(h=>h.includes('ใบสั่ง')||h.includes('Order'));
+      const demandIdx = hdr.findIndex(h=>h.includes('ปริมาณความต้องการ')||h.includes('Reqmt Qty'));
+      if(mvtIdx>=0){
+        processZmb261(rows.slice(1), {codeIdx,nameIdx,unitIdx,demandIdx,movedIdx,diffIdx,orderIdx,mvtIdx,dateIdx});
+      }
       document.getElementById('zmb25Label').textContent=`ZMB25 ✓ (${zmb25Data.length})`;
       if(Object.keys(cn43nData).length){
         processZmb();
@@ -4851,6 +4937,183 @@ function processZmb(){
     window.fbSave('cn43n', {status:cn43nData, nameMap:cn43nNameMap, superMap:cn43nSuperMap});
     window.fbSave('zmb25', zmb25Data).then(()=>showToast('บันทึก ZMB25+CN43N cloud สำเร็จ ✓'));
   }
+}
+
+// ══ ZMB25·261 functions ═══════════════════════════════════════
+function processZmb261(rows, idx){
+  var grouped = {};
+  rows.forEach(function(r){
+    if(!r[idx.codeIdx]) return;
+    var mvt = String(r[idx.mvtIdx]||'').trim();
+    if(mvt !== '261') return;
+    var code = String(r[idx.codeIdx]).replace(/-/g,'').trim();
+    if(!code) return;
+    if(!grouped[code]){
+      grouped[code] = {
+        code: code,
+        name: String(r[idx.nameIdx]||'').trim(),
+        unit: String(r[idx.unitIdx]||'').trim(),
+        demand: 0, moved: 0, diff: 0,
+        orders: new Set(),
+        latestDate: ''
+      };
+    }
+    var g = grouped[code];
+    g.demand += parseFloat(r[idx.demandIdx>=0?idx.demandIdx:idx.diffIdx])||0;
+    g.moved  += idx.movedIdx>=0 ? (parseFloat(r[idx.movedIdx])||0) : 0;
+    g.diff   += parseFloat(r[idx.diffIdx])||0;
+    if(idx.orderIdx>=0 && r[idx.orderIdx]) g.orders.add(String(r[idx.orderIdx]));
+    // เก็บวันที่ล่าสุด
+    if(idx.dateIdx>=0 && r[idx.dateIdx]){
+      var d = String(r[idx.dateIdx]).trim();
+      if(d > g.latestDate) g.latestDate = d;
+    }
+  });
+
+  zmb261Result = Object.values(grouped).map(function(g){
+    // หา stock จาก invData
+    var stock = 0;
+    (invData||[]).forEach(function(inv){
+      if(inv.code === g.code) stock += (inv.stock||0);
+    });
+    return {
+      code: g.code, name: g.name, unit: g.unit,
+      demand: Math.round(g.demand*1000)/1000,
+      moved:  Math.round(g.moved*1000)/1000,
+      diff:   Math.round(g.diff*1000)/1000,
+      orderCount: g.orders.size,
+      latestDate: g.latestDate,
+      group: groupMap[g.code]||'',
+      stock: stock,
+      surplus: Math.round((stock - g.diff)*1000)/1000
+    };
+  });
+
+  // populate group filter dropdown
+  var groups = [...new Set(zmb261Result.map(function(r){return r.group;}).filter(Boolean))].sort();
+  var sg = document.getElementById('zmb261GroupFilter');
+  if(sg){
+    sg.innerHTML = '<option value="">ทุกกลุ่ม</option>' +
+      groups.map(function(g){return '<option value="'+g+'">'+g+'</option>';}).join('');
+  }
+
+  // update stats
+  var pending = zmb261Result.filter(function(r){return r.diff>0;}).length;
+  var done    = zmb261Result.filter(function(r){return r.diff<=0;}).length;
+  var shortage = zmb261Result.filter(function(r){return r.diff>0&&r.surplus<0;}).length;
+  var statsEl = document.getElementById('zmb261Stats');
+  if(statsEl){
+    statsEl.innerHTML =
+      '<div class="sc b"><div class="sc-label">รหัสพัสดุทั้งหมด</div>' +
+        '<div class="sc-val">'+zmb261Result.length.toLocaleString()+'</div>' +
+        '<div class="sc-sub">unique รหัส mvt 261</div></div>'+
+      '<div class="sc r"><div class="sc-label">ค้างเบิก</div>' +
+        '<div class="sc-val">'+pending.toLocaleString()+'</div>' +
+        '<div class="sc-sub">diff > 0</div></div>'+
+      '<div class="sc g"><div class="sc-label">เบิกครบแล้ว</div>' +
+        '<div class="sc-val">'+done.toLocaleString()+'</div>' +
+        '<div class="sc-sub">diff ≤ 0</div></div>'+
+      '<div class="sc y"><div class="sc-label">ขาดแคลน</div>' +
+        '<div class="sc-val">'+shortage.toLocaleString()+'</div>' +
+        '<div class="sc-sub">คงคลัง < ค้างเบิก</div></div>';
+  }
+
+  // reset status filter select to default
+  var sfEl = document.getElementById('zmb261StatusFilter');
+  if(sfEl) sfEl.value = 'pending';
+  zmb261StatusFilter = 'pending';
+
+  renderZmb261();
+  showToast('ประมวลผล ZMB25·261 สำเร็จ '+zmb261Result.length+' รหัสวัสดุ');
+}
+
+function renderZmb261(){
+  var body = document.getElementById('zmb261Body');
+  if(!body) return;
+  if(!zmb261Result.length){
+    body.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--muted)">กรุณาอัปโหลด ZMB25 เพื่อดูข้อมูล</td></tr>';
+    return;
+  }
+
+  var q = ((document.getElementById('zmb261Search')||{}).value||'').toLowerCase();
+  var stF = zmb261StatusFilter;
+  var grpF = zmb261GroupFilter;
+  var sort = zmb261Sort;
+
+  var rows = zmb261Result.filter(function(r){
+    if(q && !r.code.includes(q) && !r.name.toLowerCase().includes(q)) return false;
+    if(stF==='pending' && r.diff<=0) return false;
+    if(stF==='done'    && r.diff>0)  return false;
+    if(grpF && r.group!==grpF) return false;
+    return true;
+  });
+
+  rows.sort(function(a,b){
+    var va=a[sort.col], vb=b[sort.col], d=sort.dir;
+    if(typeof va==='string'){va=va.toLowerCase();vb=vb.toLowerCase();return d*va.localeCompare(vb,'th');}
+    return d*(va-vb);
+  });
+
+  // update sort icons
+  ['code','name','group','demand','moved','diff','stock','surplus','orderCount'].forEach(function(c){
+    var el=document.getElementById('zmb261Si-'+c);
+    if(el) el.textContent = c===sort.col ? (sort.dir===1?'↑':'↓') : '↕';
+  });
+
+  // pagination
+  var total = rows.length;
+  var pages = Math.max(1, Math.ceil(total/ZMB261_PS));
+  if(zmb261Page>pages) zmb261Page=1;
+  var sl = rows.slice((zmb261Page-1)*ZMB261_PS, zmb261Page*ZMB261_PS);
+
+  document.getElementById('zmb261Pi').textContent = 'แสดง '+sl.length+' / '+total+' รายการ';
+  renderPag('zmb261Pi','zmb261Pbtns',zmb261Page,pages,total,function(p){zmb261Page=p;renderZmb261();});
+
+  body.innerHTML = sl.map(function(r){
+    var isPending = r.diff > 0;
+    var diffColor = r.diff>0  ? 'color:var(--accent2);font-weight:700'
+                  : r.diff===0 ? 'color:var(--accent)'
+                  : 'color:var(--muted)';
+    var surpColor = r.surplus<0 ? 'color:var(--accent2);font-weight:700'
+                  : r.surplus===0 ? 'color:var(--muted)'
+                  : 'color:var(--accent)';
+    var statusBadge = isPending
+      ? '<span style="font-size:.74rem;padding:2px 9px;border-radius:10px;background:rgba(255,107,107,.15);color:var(--accent2);border:1px solid rgba(255,107,107,.4);font-weight:600;white-space:nowrap">🟡 ค้างเบิก</span>'
+      : '<span style="font-size:.74rem;padding:2px 9px;border-radius:10px;background:rgba(79,255,176,.1);color:var(--accent);border:1px solid rgba(79,255,176,.3)">✅ เบิกครบ</span>';
+    return '<tr>'+
+      '<td class="mono" style="font-weight:700;color:var(--accent)">'+r.code+'</td>'+
+      '<td style="font-size:.82rem;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="'+r.name+'">'+r.name+'</td>'+
+      '<td style="font-size:.75rem;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+( r.group||'–' )+'</td>'+
+      '<td class="mono" style="text-align:right">'+r.demand.toLocaleString()+'</td>'+
+      '<td class="mono" style="text-align:right;color:var(--accent3)">'+r.moved.toLocaleString()+'</td>'+
+      '<td class="mono" style="text-align:right;'+diffColor+'">'+(r.diff>0?r.diff.toLocaleString():'–')+'</td>'+
+      '<td class="mono" style="text-align:right;'+(r.stock===0?'color:var(--accent2);font-weight:700':'')+'">'+r.stock.toLocaleString()+'</td>'+
+      '<td class="mono" style="text-align:right;'+surpColor+'">'+(r.surplus>0?'+':'')+r.surplus.toLocaleString()+'</td>'+
+      '<td class="mono" style="text-align:right;color:var(--muted)">'+r.orderCount+'</td>'+
+      '<td style="text-align:center">'+statusBadge+'</td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--muted)">ไม่พบรายการที่ตรงเงื่อนไข</td></tr>';
+}
+
+function sortZmb261(col){
+  zmb261Sort.dir = zmb261Sort.col===col ? -zmb261Sort.dir : -1;
+  zmb261Sort.col = col;
+  zmb261Page = 1;
+  renderZmb261();
+}
+
+function exportZmb261CSV(){
+  var rows = zmb261Result.filter(function(r){
+    if(zmb261StatusFilter==='pending' && r.diff<=0) return false;
+    if(zmb261StatusFilter==='done'    && r.diff>0)  return false;
+    if(zmb261GroupFilter && r.group!==zmb261GroupFilter) return false;
+    return true;
+  });
+  var hdr = ['รหัสวัสดุ','ชื่อพัสดุ','กลุ่มพัสดุ','หน่วย','ปริมาณต้องการ','เบิกแล้ว','ค้างเบิก','คงคลัง','ผลต่าง','จำนวน Order','สถานะ'];
+  var data = rows.map(function(r){
+    return [r.code, r.name, r.group, r.unit, r.demand, r.moved, r.diff, r.stock, r.surplus, r.orderCount, r.diff>0?'ค้างเบิก':'เบิกครบ'];
+  });
+  dlCSV([hdr].concat(data), 'zmb25_261.csv');
 }
 
 function renderZmb(){
