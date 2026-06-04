@@ -8274,8 +8274,8 @@ function handleMe2n(event, fileType){
       const k04Rows = rows.filter(function(r){ return String(r['กลุ่มการจัดซื้อ']||'').trim()==='K04'; });
       const normalRows = rows.filter(function(r){ return String(r['กลุ่มการจัดซื้อ']||'').trim()!=='K04'; });
 
-      // parse ส่วนปกติสำหรับหน้า ME2N
-      const parsed = _parseMe2nRows(normalRows, fileType);
+      // parse ทุกแถวสำหรับหน้า ME2N (รวม K04 ด้วย)
+      const parsed = _parseMe2nRows(rows.filter(r=>r['วัสดุ']), fileType);
       if(fileType==='103'){ me2nData103=parsed; }
       else { me2nData104=parsed; }
       if(window.fbSave){
