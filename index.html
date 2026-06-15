@@ -4347,6 +4347,8 @@ function openZmbMo(code){
   function getFilteredRows(){
     const q=zmbMoSearch.toLowerCase();
     return r.wbsList.filter(w=>{
+      // กรอง demand = 0 ออก (เบิกครบแล้ว)
+      if(w.demand===0) return false;
       // ถ้ามี filter เลือกไว้ → กรองด้วย filter (ไม่สนใจ search text)
       // ถ้าไม่มี filter → กรองด้วย search text
       if(zmbMoFilter.size>0) return zmbMoFilter.has(w.wbs);
