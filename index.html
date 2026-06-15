@@ -255,6 +255,7 @@ window.loadCloudData = async function(){
       invData = mb52Raw.invData || [];
       // โหลด whStock จาก chunk ต่างๆ
       let whRaw = {};
+      let whRawNew = {}; // เฉพาะ chunk ใหม่ — ใช้ตรวจว่า code ยังอยู่ใน MB52 ล่าสุดหรือไม่
       const numChunks = (whRaw_meta && whRaw_meta.chunks) ? whRaw_meta.chunks : 1;
       try {
         // โหลด mb52_wh เก่าก่อน (backward compat) แล้วให้ chunk ใหม่ override ทับ
@@ -264,10 +265,11 @@ window.loadCloudData = async function(){
         const chunkLoads = [];
         for(let ci=0; ci<numChunks; ci++) chunkLoads.push(window.fbLoad('mb52_wh_'+ci));
         const chunkResults = await Promise.all(chunkLoads);
-        chunkResults.forEach(c=>{ if(c) Object.assign(whRaw, c); });
+        chunkResults.forEach(c=>{ if(c){ Object.assign(whRaw, c); Object.assign(whRawNew, c); } });
       } catch(e) { console.warn('whStock load error', e); }
-      // สร้าง set ของ code ที่มีใน whRaw (มาจาก MB52 upload ล่าสุด)
-      const whRawCodes = new Set(Object.keys(whRaw).map(k=>k.split('||')[0]));
+      // ใช้เฉพาะ code จาก chunk ใหม่เพื่อตรวจว่ายังอยู่ใน MB52 ล่าสุด
+      // (ไม่ใช้ whRaw ที่รวม oldWh เพราะจะทำให้ code เก่าที่ถูกลบออกแล้วยังถือว่ามีอยู่)
+      const whRawCodes = new Set(Object.keys(whRawNew).map(k=>k.split('||')[0]));
       if(Object.keys(whRaw).length>0){
         invData = invData.map(d=>{
           const k = d.code+'||'+(d.batch||'');
