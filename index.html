@@ -8418,14 +8418,18 @@ async function _confirmMe2n103Update(items){
         const rPrNo=String(sheetRows[i][2]||'').trim();
         const rCode=String(sheetRows[i][7]||'').replace(/-/g,'').trim();
         if(rPrNo===m.prNo && rCode===m.code){
-          // บันทึก vendor ลง col บริษัท (col S = index 18) ถ้ามีค่า
-          if(m.vendor) {
-            await sheetsUpdate(`ขอซื้อ!D${i+1}:E${i+1}`,[[m.poDateNew, m.poNoNew]]);
-          } else {
-            await sheetsUpdate(`ขอซื้อ!D${i+1}:E${i+1}`,[[m.poDateNew, m.poNoNew]]);
+          // อัปเดต PO Date (col D) และ PO No. (col E)
+          await sheetsUpdate(`ขอซื้อ!D${i+1}:E${i+1}`,[[m.poDateNew, m.poNoNew]]);
+          // อัปเดต บริษัท (col U) ถ้ามีค่าจาก ME2N
+          if(m.vendor){
+            await sheetsUpdate(`ขอซื้อ!U${i+1}`,[[m.vendor]]);
           }
-          // update local prData
-          if(m.rowRef){ m.rowRef.poDate=m.poDateNew; m.rowRef.poNo=m.poNoNew; if(m.vendor) m.rowRef.vendor=m.vendor; }
+          // update local prData — ใช้ field company (ตรงกับ renderPr)
+          if(m.rowRef){
+            m.rowRef.poDate = m.poDateNew;
+            m.rowRef.poNo = m.poNoNew;
+            if(m.vendor) m.rowRef.company = m.vendor;
+          }
           updated++;
           break;
         }
