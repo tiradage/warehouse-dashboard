@@ -258,14 +258,16 @@ window.loadCloudData = async function(){
       let whRawNew = {}; // เฉพาะ chunk ใหม่ — ใช้ตรวจว่า code ยังอยู่ใน MB52 ล่าสุดหรือไม่
       const numChunks = (whRaw_meta && whRaw_meta.chunks) ? whRaw_meta.chunks : 1;
       try {
-        // โหลด mb52_wh เก่าก่อน (backward compat) แล้วให้ chunk ใหม่ override ทับ
-        const oldWh = await window.fbLoad('mb52_wh');
-        if(oldWh) Object.assign(whRaw, oldWh);
-        // โหลด chunk ใหม่ (override ค่าเก่า)
+        // โหลด chunk ใหม่ก่อน
         const chunkLoads = [];
         for(let ci=0; ci<numChunks; ci++) chunkLoads.push(window.fbLoad('mb52_wh_'+ci));
         const chunkResults = await Promise.all(chunkLoads);
         chunkResults.forEach(c=>{ if(c){ Object.assign(whRaw, c); Object.assign(whRawNew, c); } });
+        // โหลด mb52_wh เก่า (backward compat) เฉพาะกรณีที่ยังไม่มี chunk ใหม่เลย
+        if(Object.keys(whRawNew).length === 0){
+          const oldWh = await window.fbLoad('mb52_wh');
+          if(oldWh) Object.assign(whRaw, oldWh);
+        }
       } catch(e) { console.warn('whStock load error', e); }
       // ใช้เฉพาะ code จาก chunk ใหม่เพื่อตรวจว่ายังอยู่ใน MB52 ล่าสุด
       // (ไม่ใช้ whRaw ที่รวม oldWh เพราะจะทำให้ code เก่าที่ถูกลบออกแล้วยังถือว่ามีอยู่)
