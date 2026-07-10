@@ -7951,7 +7951,7 @@ function runRecommend(){
     // AND — ต้องผ่านทุกเงื่อนไขที่ติ๊ก
     if(!m_c1||!m_c2a||!m_c2b||!m_c2c||!m_c3||!m_c4) return;
     if(grpF && grp!==grpF) return;
-    if(demand===0) return;
+    // ไม่กรอง demand===0 ออก เพราะรหัสที่ SS ต่ำกว่า 50% ควรแสดงแม้ไม่มีใน ZMB25
 
     // สร้าง badge เหตุผลเฉพาะเงื่อนไขที่ติ๊กและผ่าน
     const reasons=[];
