@@ -4586,7 +4586,7 @@ function openPrMo(id){
     <hr class="mdivider">
     <div class="mf"><label>มูลค่ารวม (THB)</label><div class="v">${r.total?Number(String(r.total).replace(/,/g,'')).toLocaleString('th-TH',{minimumFractionDigits:2}):'–'}</div></div>
     <div class="mf"><label>บริษัท</label>
-      ${canEditNow?`<input type="text" id="upd_company" value="${r.company||''}" placeholder="ชื่อบริษัท..." class="mo-input" style="width:100%;font-family:'Sarabun',sans-serif">`:
+      ${(gAccessToken||(window.userPerms&&window.userPerms.canEditPr))?`<input type="text" id="upd_company" value="${r.company||''}" placeholder="ชื่อบริษัท..." class="mo-input" style="width:100%;font-family:'Sarabun',sans-serif">`:
       `<div class="v" style="font-family:'Sarabun',sans-serif">${r.company||'–'}</div>`}</div>
     <div class="mf"><label>กลุ่ม</label><div class="v" style="font-family:'Sarabun',sans-serif">${r.group||'–'}</div></div>
     ${r.note?`<div class="mf full"><label>หมายเหตุ</label><div class="v" style="font-family:'Sarabun',sans-serif">${r.note}</div></div>`:''}`;
