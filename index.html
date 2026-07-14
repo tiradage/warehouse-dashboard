@@ -8414,28 +8414,39 @@ async function _confirmMe2n103Update(items){
     const res=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_PR_ID}/values/${encodeURIComponent('ขอซื้อ')}?key=${API_KEY}`);
     const json=await res.json();
     const sheetRows=json.values||[];
+
+    // รวบรวม valueRanges ทั้งหมดก่อน แล้วส่งครั้งเดียว (batchUpdate)
+    const valueRanges=[];
     for(const m of items){
-      // หา row index ใน sheet
       for(let i=1;i<sheetRows.length;i++){
         const rPrNo=String(sheetRows[i][2]||'').trim();
         const rCode=String(sheetRows[i][7]||'').replace(/-/g,'').trim();
         if(rPrNo===m.prNo && rCode===m.code){
-          // อัปเดต PO Date (col D) และ PO No. (col E)
-          await sheetsUpdate(`ขอซื้อ!D${i+1}:E${i+1}`,[[m.poDateNew, m.poNoNew]]);
-          // อัปเดต บริษัท (col U) ถ้ามีค่าจาก ME2N
-          if(m.vendor){
-            await sheetsUpdate(`ขอซื้อ!U${i+1}`,[[m.vendor]]);
-          }
-          // update local prData — ใช้ field company (ตรงกับ renderPr)
+          // PO Date (col D) + PO No. (col E)
+          valueRanges.push({range:`ขอซื้อ!D${i+1}:E${i+1}`, values:[[m.poDateNew, m.poNoNew]]});
+          // บริษัท (col U)
+          if(m.vendor) valueRanges.push({range:`ขอซื้อ!U${i+1}`, values:[[m.vendor]]});
+          // update local
           if(m.rowRef){
-            m.rowRef.poDate = m.poDateNew;
-            m.rowRef.poNo = m.poNoNew;
-            if(m.vendor) m.rowRef.company = m.vendor;
+            m.rowRef.poDate=m.poDateNew;
+            m.rowRef.poNo=m.poNoNew;
+            if(m.vendor) m.rowRef.company=m.vendor;
           }
           updated++;
           break;
         }
       }
+    }
+    // ส่ง batchUpdate ครั้งเดียว
+    if(valueRanges.length>0){
+      try{ await ensureToken(); }catch(e){ showToast('กรุณา Login ก่อนครับ',true); return; }
+      const batchUrl=`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_PR_ID}/values:batchUpdate`;
+      const batchRes=await fetch(batchUrl,{
+        method:'POST',
+        headers:{Authorization:'Bearer '+gAccessToken,'Content-Type':'application/json'},
+        body:JSON.stringify({valueInputOption:'USER_ENTERED', data:valueRanges})
+      });
+      if(!batchRes.ok){const e=await batchRes.json();throw new Error(e.error?.message||'batchUpdate error');}
     }
     renderPr(); renderPrStats();
     showToast('อัปเดต PO สำเร็จ '+updated+' รายการ ✓');
@@ -8451,16 +8462,33 @@ async function _confirmMe2n104Update(items){
     const res=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_PR_ID}/values/${encodeURIComponent('ขอซื้อ')}?key=${API_KEY}`);
     const json=await res.json();
     const sheetRows=json.values||[];
+    const valueRanges=[];
     for(const d of items){
       for(let i=1;i<sheetRows.length;i++){
         const rPoNo=String(sheetRows[i][4]||'').trim();
         const rCode=String(sheetRows[i][7]||'').replace(/-/g,'').trim();
         if(rPoNo===d.poNo && rCode===d.itemCode){
-          await sheetsUpdate(`ขอซื้อ!P${i+1}`,[ ['รับแล้ว'] ]);
+          valueRanges.push({range:`ขอซื้อ!P${i+1}`, values:[['รับแล้ว']]});
+          // บริษัท (col U) จาก ME2N 104
+          if(d._vendor104 && (!d.company||d.company==='–'||d.company==='')){
+            valueRanges.push({range:`ขอซื้อ!U${i+1}`, values:[[d._vendor104]]});
+            d.company=d._vendor104;
+          }
           d.s103='รับแล้ว';
           updated++;
         }
       }
+    }
+    // ส่ง batchUpdate ครั้งเดียว
+    if(valueRanges.length>0){
+      try{ await ensureToken(); }catch(e){ showToast('กรุณา Login ก่อนครับ',true); return; }
+      const batchUrl=`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_PR_ID}/values:batchUpdate`;
+      const batchRes=await fetch(batchUrl,{
+        method:'POST',
+        headers:{Authorization:'Bearer '+gAccessToken,'Content-Type':'application/json'},
+        body:JSON.stringify({valueInputOption:'USER_ENTERED', data:valueRanges})
+      });
+      if(!batchRes.ok){const e=await batchRes.json();throw new Error(e.error?.message||'batchUpdate error');}
     }
     renderPr(); renderPrStats();
     showToast('อัปเดต 103 สำเร็จ '+updated+' รายการ ✓');
